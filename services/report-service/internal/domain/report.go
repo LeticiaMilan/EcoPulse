@@ -1,7 +1,9 @@
 package domain
 
 import (
+	"context"
 	"errors"
+	"report-service/internal/ports"
 	"report-service/pkg"
 	"time"
 
@@ -50,9 +52,8 @@ type Report struct {
 }
 
 // Validações futuras
-func (r *Report) Validate(clock BrasilClock, checker ReportTypeChecker) error {
-
-	if err := r.IsCoordinatesValid(); err != nil {
+func (r *Report) Validate(ctx *context.Context, GeocodingApi *ports.GeocodingAPI, clock BrasilClock, checker ReportTypeChecker) error {
+	if err := r.IsCoordinatesValid(ctx, *GeocodingApi); err != nil {
 		return err
 	}
 
@@ -73,14 +74,20 @@ func (r *Report) Transite() {
 
 }
 
-func (r *Report) IsCoordinatesValid() error {
+func (r *Report) IsCoordinatesValid(ctx *context.Context, GeocodingApi ports.GeocodingAPI) error {
 	if r.Latitude <= -90 || r.Latitude >= 90 || r.Longitude <= -180 || r.Longitude >= 180 {
 		return ErrInvalidCoordinates
 	}
-
-	// if não é brasil
-	//  return ErrInvalidLocation
-	//
+	inputParams := ports.GeocodingInputParams{
+		Latitude:  r.Latitude,
+		Longitude: r.Longitude,
+	}
+	if isBrasil, err := GeocodingApi.IsBrazil(*ctx, &inputParams); !isBrasil || err != nil {
+		if err != nil {
+			return err
+		}
+		return ErrInvalidLocation
+	}
 	return nil
 }
 
