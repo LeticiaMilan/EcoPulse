@@ -7,6 +7,15 @@ import (
 	"github.com/google/uuid"
 )
 
+type EventEnvelope struct {
+	ID          uuid.UUID `json:"id"`
+	Source      string    `json:"source"`
+	Type        string    `json:"type"`
+	Subject     string    `json:"subject"`
+	Time        time.Time `json:"time"`
+	ContentType string    `json:"contentType"`
+	Data        any       `json:"data"`
+}
 type InboxStatus string
 
 var (
@@ -23,11 +32,11 @@ type inboxPayload struct {
 }
 
 type Inbox struct {
-	ID           uuid.UUID   `db:"id"`
-	EventType    string      `db:"event_type"`
-	Status       InboxStatus `db:"status"`
-	Content      []byte      `db:"content"`
-	Retries      int8        `db:"retries"`
-	Received_at  time.Time   `db:"received_at"`
-	Processed_at time.Time   `db:"processed_at"`
+	ID           uuid.UUID
+	EventType    string
+	Status       InboxStatus
+	Content      []byte
+	Retries      int8
+	Received_at  time.Time
+	Processed_at time.Time
 }

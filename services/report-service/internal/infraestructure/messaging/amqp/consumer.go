@@ -1,31 +1,24 @@
 package amqp
 
 import (
+	"context"
 	"encoding/json"
-	"fmt"
-	"log"
-	"time"
-
-	"github.com/google/uuid"
+	"report-service/internal/application/inbox"
+	"report-service/internal/infraestructure/persistence/postgres/mappers"
 )
 
-type EventEnvelope struct {
-	ID          uuid.UUID `json:"id"`
-	Source      string    `json:"source"`
-	Type        string    `json:"type"`
-	Subject     string    `json:"subject"`
-	Time        time.Time `json:"time"`
-	ContentType string    `json:"contentType"`
-	Data        any       `json:"data"`
-}
 type Consumer struct {
-	Manager *QueueManager
-	Fila    string
+	InboxRepository inbox.InboxRepository
+	Manager         *QueueManager
+	Fila            string
 }
 
-func (c *Consumer) NewConsumer(manager *QueueManager, fila string) {
-	c.Manager = manager
-	c.Fila = fila
+func NewConsumer(manager *QueueManager, fila string, inboxRepository inbox.InboxRepository) *Consumer {
+	return &Consumer{
+		Manager:         manager,
+		Fila:            fila,
+		InboxRepository: inboxRepository,
+	}
 }
 
 func (c *Consumer) Start() error {
@@ -50,13 +43,22 @@ func (c *Consumer) Start() error {
 		return err
 	}
 
-	var envelope EventEnvelope
+	var envelope inbox.EventEnvelope
 
-	// PESQUISAR SOBRE PADRÃO ENVELOPE PARA SCHEMA DE DADOS NO AMQP (CloudEvents)
 	for msg := range msgs {
-		err = json.Unmarshal(msg.Body, &envelope)
-		fmt.Println(envelope)
-		log.Printf("Received a message: %s", msg.Body)
+		if err := json.Unmarshal(msg.Body, &envelope); err != nil {
+			return err
+		}
+
+		inboxModel := mappers.MapInboxEventToApplication(envelope)
+		ctx := context.Background()
+
+		if err := c.InboxRepository.Save(ctx, inboxModel); err != nil {
+			return err
+		}
+		if err := msg.Ack(false); err != nil {
+			return err
+		}
 	}
 
 	return nil
