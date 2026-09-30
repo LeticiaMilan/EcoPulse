@@ -1,4 +1,4 @@
-package domain
+package inbox
 
 import (
 	"errors"
@@ -22,16 +22,12 @@ const (
 type inboxPayload struct {
 }
 
-type inbox struct {
-	ID           uuid.UUID
-	EventType    string
-	Status       InboxStatus
-	content      inboxPayload
-	retries      int8
-	received_at  time.Time
-	processed_at time.Time
-}
-
-func (i *inbox) Process() {
-
+type Inbox struct {
+	ID           uuid.UUID   `db:"id"`
+	EventType    string      `db:"event_type"`
+	Status       InboxStatus `db:"status"`
+	Content      []byte      `db:"content"`
+	Retries      int8        `db:"retries"`
+	Received_at  time.Time   `db:"received_at"`
+	Processed_at time.Time   `db:"processed_at"`
 }

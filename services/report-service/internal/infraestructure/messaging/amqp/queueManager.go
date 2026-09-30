@@ -8,15 +8,15 @@ type QueueManager struct {
 	conn *amqp.Connection
 }
 
-func NewQueueManager(url string) (*QueueManager, error) {
-	conn, err := amqp.Dial(url)
+func (q *QueueManager) NewEventManager(url string) error {
+	var err error
+	q.conn, err = amqp.Dial(url)
+
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return &QueueManager{
-		conn: conn,
-	}, nil
+	return nil
 }
 
 func (qm *QueueManager) CreateChannel() (*amqp.Channel, error) {
