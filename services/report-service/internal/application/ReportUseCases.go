@@ -4,7 +4,7 @@ package application
 
 type ProcessReportUseCase struct{}
 
-func (uc *ProcessReportUseCase) Execute() error {
+func (uc *ProcessReportUseCase) Execute(ReportGeneratedEventDTO *ReportGeneratedEventDTO) error {
 
 	return nil
 }

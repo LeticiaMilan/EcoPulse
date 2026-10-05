@@ -33,5 +33,9 @@ func (h *ReportGeneratedHandler) Handle(ctx context.Context, payload []byte) err
 		return fmt.Errorf("cannot unmarshal payload: %w", err)
 	}
 
+	if err := h.reportUseCase.Execute(&ReportDTO); err != nil {
+		return fmt.Errorf("cannot execute report: %w", err)
+	}
+
 	return nil
 }

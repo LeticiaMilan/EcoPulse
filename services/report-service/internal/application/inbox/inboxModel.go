@@ -1,6 +1,7 @@
 package inbox
 
 import (
+	"encoding/json"
 	"errors"
 	"time"
 
@@ -8,13 +9,13 @@ import (
 )
 
 type EventEnvelope struct {
-	ID          uuid.UUID `json:"id"`
-	Source      string    `json:"source"`
-	Type        string    `json:"type"`
-	Subject     string    `json:"subject"`
-	Time        time.Time `json:"time"`
-	ContentType string    `json:"contentType"`
-	Data        any       `json:"data"`
+	ID          uuid.UUID       `json:"id"`
+	Source      string          `json:"source"`
+	Type        string          `json:"type"`
+	Subject     string          `json:"subject"`
+	Time        time.Time       `json:"time"`
+	ContentType string          `json:"contentType"`
+	Data        json.RawMessage `json:"data"`
 }
 type InboxStatus string
 
@@ -36,7 +37,7 @@ type Inbox struct {
 	EventType    string
 	Status       InboxStatus
 	Content      []byte
-	Retries      int8
+	Retries      int32
 	Received_at  time.Time
 	Processed_at time.Time
 }

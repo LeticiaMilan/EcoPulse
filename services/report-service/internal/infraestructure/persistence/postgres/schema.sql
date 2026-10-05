@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS inbox(
     event_type   VARCHAR(100),
     status       VARCHAR(100),
     content      JSONB,
-    retries      int,
+    retries      INT NOT NULL DEFAULT 0,
     received_at  timestamptz,
     processed_at timestamptz
 );

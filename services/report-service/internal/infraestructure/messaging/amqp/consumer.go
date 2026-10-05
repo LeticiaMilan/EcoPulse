@@ -3,6 +3,7 @@ package amqp
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"report-service/internal/application/inbox"
 	"report-service/internal/infraestructure/persistence/postgres/mappers"
 )
@@ -43,21 +44,25 @@ func (c *Consumer) Start() error {
 		return err
 	}
 
+	log.Print("Consumer started")
 	var envelope inbox.EventEnvelope
 
 	for msg := range msgs {
 		if err := json.Unmarshal(msg.Body, &envelope); err != nil {
-			return err
-		}
+			log.Print("Consumer failed to unmarshal event: " + err.Error())
+		} else {
 
-		inboxModel := mappers.MapInboxEventToApplication(envelope)
-		ctx := context.Background()
+			inboxModel := mappers.MapInboxEventToApplication(envelope)
+			ctx := context.Background()
 
-		if err := c.InboxRepository.Save(ctx, inboxModel); err != nil {
-			return err
-		}
-		if err := msg.Ack(false); err != nil {
-			return err
+			if err := c.InboxRepository.Save(ctx, inboxModel); err != nil {
+				log.Print("Consumer failed to save event: " + err.Error())
+			} else {
+
+				if err := msg.Ack(false); err != nil {
+					log.Print("Consumer failed to ack event: " + err.Error())
+				}
+			}
 		}
 	}
 
