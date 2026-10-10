@@ -3,6 +3,7 @@ package LatLngWorkGeocoding
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 
@@ -41,6 +42,7 @@ func (g *LatLngWorkGeocodingAPI) IsBrazil(ctx context.Context, GeocodingInputPar
 	req, _ := http.NewRequestWithContext(ctx, "GET", finalUrl, nil)
 	req.Header.Add("X-Api-Key", g.Params.Apikey)
 	response, err := g.httpClient.Do(req)
+	log.Println(response.StatusCode)
 	return false, err
 }
 func FormatLatLng(latitude float64) string {

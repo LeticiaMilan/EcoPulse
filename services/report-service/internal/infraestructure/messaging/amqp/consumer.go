@@ -4,17 +4,17 @@ import (
 	"context"
 	"encoding/json"
 	"log"
-	"report-service/internal/application/inbox"
-	"report-service/internal/infraestructure/persistence/postgres/mappers"
+	"report-service/internal/infraestructure/entrypoint/worker"
+	"report-service/internal/ports"
 )
 
 type Consumer struct {
-	InboxRepository inbox.InboxRepository
+	InboxRepository ports.InboxRepository
 	Manager         *QueueManager
 	Fila            string
 }
 
-func NewConsumer(manager *QueueManager, fila string, inboxRepository inbox.InboxRepository) *Consumer {
+func NewConsumer(manager *QueueManager, fila string, inboxRepository ports.InboxRepository) *Consumer {
 	return &Consumer{
 		Manager:         manager,
 		Fila:            fila,
@@ -45,17 +45,17 @@ func (c *Consumer) Start() error {
 	}
 
 	log.Print("Consumer started")
-	var envelope inbox.EventEnvelope
+	var envelope worker.EventEnvelope
 
 	for msg := range msgs {
 		if err := json.Unmarshal(msg.Body, &envelope); err != nil {
 			log.Print("Consumer failed to unmarshal event: " + err.Error())
 		} else {
 
-			inboxModel := mappers.MapInboxEventToApplication(envelope)
+			inboxModel := worker.MapInboxEventToApplication(&envelope)
 			ctx := context.Background()
 
-			if err := c.InboxRepository.Save(ctx, inboxModel); err != nil {
+			if err := c.InboxRepository.Save(&ctx, inboxModel); err != nil {
 				log.Print("Consumer failed to save event: " + err.Error())
 			} else {
 

@@ -3,10 +3,15 @@ package main
 import (
 	"context"
 	"log"
+	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"report-service/internal/application"
-	"report-service/internal/application/inbox"
+	"report-service/internal/infraestructure/entrypoint/delivery"
+	"report-service/internal/infraestructure/entrypoint/worker"
+	"report-service/internal/infraestructure/external/BrasilNtp"
+	"report-service/internal/infraestructure/external/LatLngWorkGeocoding"
 	"report-service/internal/infraestructure/messaging/amqp"
 	"report-service/internal/infraestructure/persistence/postgres/repository"
 	"syscall"
@@ -42,17 +47,38 @@ func main() {
 
 	go consumer1.Start()
 
-	ReportGeneratedHandler := application.ReportGeneratedHandler{}
-	processor1 := inbox.NewInboxProcessor()
-	processor1.RegisterHandler("events.report.generated", &ReportGeneratedHandler)
+	var httpClient *http.Client
+	httpClient = &http.Client{
+		Timeout: 20 * time.Second,
+		Transport: &http.Transport{
+			MaxIdleConns:        100,              // Total de conexões inativas mantidas no pool
+			MaxIdleConnsPerHost: 3,                // Conexões inativas por host (padrão do Go é apenas 2)
+			IdleConnTimeout:     90 * time.Second, // Tempo que uma conexão pode ficar inativa antes de fechar
+			DialContext: (&net.Dialer{
+				Timeout:   5 * time.Second,  // Timeout para abrir a conexão TCP
+				KeepAlive: 30 * time.Second, // Frequência do Keep-Alive no nível do SO
+			}).DialContext,
+		},
+	}
+
+	ReportRepository := repository.NewReportRepository(pool)
+	GeoCodingAPI := LatLngWorkGeocoding.NewLatLngWorkGeocodingApi(httpClient)
+	BrasilNtpClock, err := BrasilNtp.NewBrasilNtpClock()
+	if err != nil {
+		log.Fatal(err)
+	}
+	reportUseCase1 := application.NewProcessReportUseCase(ReportRepository, GeoCodingAPI, BrasilNtpClock)
+	ReportGeneratedHandler := delivery.NewReportGeneratedHandler(reportUseCase1)
+	processor1 := delivery.NewInboxProcessor()
+	processor1.RegisterHandler("EVENTS.GENERATED.REPORT", ReportGeneratedHandler)
 
 	// Escutar interrupções do S.O
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	inboxWorker1 := inbox.NewInboxWorker(InboxRepository, processor1)
+	inboxWorker1 := worker.NewInboxWorker(InboxRepository, processor1)
 	cont := context.Background()
-	go inboxWorker1.Process(cont)
+	go inboxWorker1.Process(&cont)
 
 	<-ctx.Done()
 }

@@ -1,13 +1,18 @@
-package application
+package delivery
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"report-service/internal/application"
 	"time"
 
 	"github.com/google/uuid"
 )
+
+type EventHandler interface {
+	Handle(ctx context.Context, payload []byte) error
+}
 
 type ReportGeneratedEventDTO struct {
 	ID        uuid.UUID `json:"id"`
@@ -19,11 +24,11 @@ type ReportGeneratedEventDTO struct {
 }
 
 type ReportGeneratedHandler struct {
-	reportUseCase *ProcessReportUseCase
+	ReportUseCase *application.GeneratedReportUseCase
 }
 
-func NewReportGeneratedHandler(reportUseCase *ProcessReportUseCase) *ReportGeneratedHandler {
-	return &ReportGeneratedHandler{reportUseCase: reportUseCase}
+func NewReportGeneratedHandler(reportUseCase *application.GeneratedReportUseCase) *ReportGeneratedHandler {
+	return &ReportGeneratedHandler{ReportUseCase: reportUseCase}
 }
 
 func (h *ReportGeneratedHandler) Handle(ctx context.Context, payload []byte) error {
@@ -33,9 +38,13 @@ func (h *ReportGeneratedHandler) Handle(ctx context.Context, payload []byte) err
 		return fmt.Errorf("cannot unmarshal payload: %w", err)
 	}
 
-	if err := h.reportUseCase.Execute(&ReportDTO); err != nil {
+	if err := h.ReportUseCase.Execute(MapReportGeneratedDTOToApplication(&ReportDTO)); err != nil {
 		return fmt.Errorf("cannot execute report: %w", err)
 	}
 
 	return nil
 }
+
+type ReportRejectedHandler struct{}
+type ReportValidatedHandler struct{}
+type ReportAreaDefinedHandler struct{}

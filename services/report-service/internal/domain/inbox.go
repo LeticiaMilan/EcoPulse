@@ -1,22 +1,12 @@
-package inbox
+package domain
 
 import (
-	"encoding/json"
 	"errors"
 	"time"
 
 	"github.com/google/uuid"
 )
 
-type EventEnvelope struct {
-	ID          uuid.UUID       `json:"id"`
-	Source      string          `json:"source"`
-	Type        string          `json:"type"`
-	Subject     string          `json:"subject"`
-	Time        time.Time       `json:"time"`
-	ContentType string          `json:"contentType"`
-	Data        json.RawMessage `json:"data"`
-}
 type InboxStatus string
 
 var (
@@ -29,12 +19,21 @@ const (
 	InboxStatusAccepted InboxStatus = "PROCESSED"
 )
 
+type InboxEventType string
+
+const (
+	GeneratedReportEvent   InboxEventType = "EVENTS.GENERATED.REPORT"
+	RejectedReportEvent    InboxEventType = "EVENTS.REJECTED.REPORT"
+	ValidatedReportEvent   InboxEventType = "EVENTS.VALIDATED.REPORT"
+	AreaDefinedReportEvent InboxEventType = "EVENTS.AREADEFINED.REPORT"
+)
+
 type inboxPayload struct {
 }
 
 type Inbox struct {
 	ID           uuid.UUID
-	EventType    string
+	EventType    InboxEventType
 	Status       InboxStatus
 	Content      []byte
 	Retries      int32

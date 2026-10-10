@@ -1,3 +1,13 @@
+CREATE TABLE IF NOT EXISTS outbox(
+    id           UUID        PRIMARY KEY,
+    event_type   VARCHAR(100),
+    status       VARCHAR(100),
+    content      JSONB,
+    retries      INT NOT NULL DEFAULT 0,
+    created_at  timestamptz,
+    processed_at timestamptz
+);
+
 CREATE TABLE IF NOT EXISTS inbox(
     id           UUID        PRIMARY KEY,
     event_type   VARCHAR(100),
@@ -13,6 +23,7 @@ CREATE TABLE IF NOT EXISTS report(
     latitude     FLOAT,
     longitude    FLOAT,
     type         VARCHAR(50),
-    user_id      UUID,
+    status       VARCHAR(50),
+    user_id      UUID       NOT NULL,
     datetime     timestamptz
 );

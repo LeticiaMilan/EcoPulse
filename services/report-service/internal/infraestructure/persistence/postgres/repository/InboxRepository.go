@@ -3,8 +3,9 @@ package repository
 import (
 	"context"
 	"log"
-	"report-service/internal/application/inbox"
+	"report-service/internal/domain"
 	"report-service/internal/infraestructure/persistence/postgres/db"
+	"report-service/internal/ports"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -16,27 +17,27 @@ type InboxRepositoryImpl struct {
 	queries *db.Queries
 }
 
-func NewCreateInboxParams(inbox *inbox.Inbox) (db.CreateInboxParams, error) {
+func NewCreateInboxParams(inbox *domain.Inbox) (*db.CreateInboxParams, error) {
 	var pgEvent pgtype.Text
 	var pgStatus pgtype.Text
 	var ReceivedAt pgtype.Timestamptz
 	var ProcessedAt pgtype.Timestamptz
 
 	if err := pgEvent.Scan(inbox.EventType); err != nil {
-		return db.CreateInboxParams{}, err
+		return nil, err
 	}
 
 	if err := pgStatus.Scan(string(inbox.Status)); err != nil {
-		return db.CreateInboxParams{}, err
+		return nil, err
 	}
 
 	if err := ReceivedAt.Scan(inbox.Received_at); err != nil {
-		return db.CreateInboxParams{}, err
+		return nil, err
 	}
 	if err := ProcessedAt.Scan(inbox.Processed_at); err != nil {
-		return db.CreateInboxParams{}, err
+		return nil, err
 	}
-	return db.CreateInboxParams{
+	return &db.CreateInboxParams{
 		ID:          inbox.ID,
 		EventType:   pgEvent,
 		Status:      pgStatus,
@@ -54,22 +55,22 @@ func NewInboxRepository(pool *pgxpool.Pool) *InboxRepositoryImpl {
 	}
 }
 
-func (repo *InboxRepositoryImpl) GetUnprocessedMessage(ctx context.Context) (inbox.Inbox, error) {
+func (repo *InboxRepositoryImpl) GetUnprocessedMessage(ctx *context.Context) (domain.Inbox, error) {
 
-	return inbox.Inbox{}, nil
+	return domain.Inbox{}, nil
 }
 
-func (repo *InboxRepositoryImpl) MarkAsProcessed(ctx context.Context, id uuid.UUID) error {
+func (repo *InboxRepositoryImpl) MarkAsProcessed(ctx *context.Context, id uuid.UUID) error {
 
 	return nil
 }
 
-func (repo *InboxRepositoryImpl) Save(ctx context.Context, inbox *inbox.Inbox) error {
+func (repo *InboxRepositoryImpl) Save(ctx *context.Context, inbox *domain.Inbox) error {
 	params, err := NewCreateInboxParams(inbox)
 	if err != nil {
 		return err
 	}
-	InboxSaved, err := repo.queries.CreateInbox(ctx, params)
+	InboxSaved, err := repo.queries.CreateInbox(*ctx, *params)
 	if err != nil {
 		return err
 	}
@@ -77,12 +78,12 @@ func (repo *InboxRepositoryImpl) Save(ctx context.Context, inbox *inbox.Inbox) e
 	return nil
 }
 
-func (repo *InboxRepositoryImpl) Tx(ctx context.Context, fn func(repository inbox.InboxRepository) error) error {
-	tx, err := repo.pool.Begin(ctx)
+func (repo *InboxRepositoryImpl) Tx(ctx *context.Context, fn func(repository ports.InboxRepository) error) error {
+	tx, err := repo.pool.Begin(*ctx)
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer tx.Rollback(*ctx)
 
 	return nil
 }
