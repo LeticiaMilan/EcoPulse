@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"report-service/internal/domain"
 	"report-service/internal/ports"
+	"report-service/pkg"
 	"time"
 
 	"github.com/google/uuid"
@@ -25,10 +26,10 @@ type GeneratedReportUseCase struct {
 	ReportRepository ports.ReportRepository
 	OutboxRepository ports.OutboxRepository
 	GeocodingAPI     ports.GeocodingAPI
-	clock            domain.BrasilClock
+	clock            ports.BrasilClock
 }
 
-func NewProcessReportUseCase(reportRepository ports.ReportRepository, geocodingAPI ports.GeocodingAPI, clock domain.BrasilClock) *GeneratedReportUseCase {
+func NewProcessReportUseCase(reportRepository ports.ReportRepository, geocodingAPI ports.GeocodingAPI, clock ports.BrasilClock) *GeneratedReportUseCase {
 	return &GeneratedReportUseCase{
 		ReportRepository: reportRepository,
 		GeocodingAPI:     geocodingAPI,
@@ -39,11 +40,15 @@ func NewProcessReportUseCase(reportRepository ports.ReportRepository, geocodingA
 func (uc *GeneratedReportUseCase) Execute(report *domain.Report) error {
 	ctx := context.Background()
 
-	if err := report.Validate(uc.clock); err != nil {
+	if err := report.Validate(); err != nil {
 		return err
 	}
 
 	if err := uc.IsCoordinatesValid(&ctx, report); err != nil {
+		return err
+	}
+
+	if err := uc.isDatetimeValid(report, uc.clock); err != nil {
 		return err
 	}
 
@@ -98,6 +103,16 @@ func (uc *GeneratedReportUseCase) IsCoordinatesValid(ctx *context.Context, r *do
 		}
 		return domain.ErrInvalidLocation
 	}
+	return nil
+}
+
+func (uc *GeneratedReportUseCase) isDatetimeValid(report *domain.Report, clock ports.BrasilClock) error {
+	today := pkg.StartOfDay(clock.Now())
+
+	if today.After(pkg.StartOfDay(report.Datetime)) && report.Status == domain.InProgress {
+		return domain.ErrInvalidDatetime
+	}
+
 	return nil
 }
 

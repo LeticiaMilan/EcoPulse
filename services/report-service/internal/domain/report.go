@@ -2,7 +2,6 @@ package domain
 
 import (
 	"errors"
-	"report-service/pkg"
 	"time"
 
 	"github.com/google/uuid"
@@ -46,13 +45,9 @@ type Report struct {
 }
 
 // Validações futuras
-func (r *Report) Validate(clock BrasilClock) error {
+func (r *Report) Validate() error {
 
 	if err := r.isReportTypeValid(); err != nil {
-		return err
-	}
-
-	if err := r.isDatetimeValid(clock); err != nil {
 		return err
 	}
 
@@ -65,21 +60,9 @@ func (r *Report) Transite() {
 
 }
 
-/*
- */
 func (r *Report) isReportTypeValid() error {
 	if r.Type != "Landslide" && r.Type != "Flooding" && r.Type != "Thunderstorm" && r.Type != "Fire Disaster" {
 		return ErrInvalidReportType
 	}
-	return nil
-}
-
-func (r *Report) isDatetimeValid(clock BrasilClock) error {
-	today := pkg.StartOfDay(clock.Now())
-
-	if today.After(pkg.StartOfDay(r.Datetime)) && r.Status == InProgress {
-		return ErrInvalidDatetime
-	}
-
 	return nil
 }
