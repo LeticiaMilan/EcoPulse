@@ -1,32 +1,70 @@
 package amqp
 
+import (
+	"context"
+	"encoding/json"
+	"log"
+	"report-service/internal/infraestructure/entrypoint/worker"
+	"report-service/internal/ports"
+)
+
 type Consumer struct {
-	manager *QueueManager
-	fila    string
+	InboxRepository ports.InboxRepository
+	Manager         *QueueManager
+	Fila            string
 }
 
-func NewConsumer(manager *QueueManager, fila string) *Consumer {
+func NewConsumer(manager *QueueManager, fila string, inboxRepository ports.InboxRepository) *Consumer {
 	return &Consumer{
-		manager: manager,
-		fila:    fila,
+		Manager:         manager,
+		Fila:            fila,
+		InboxRepository: inboxRepository,
 	}
 }
 
 func (c *Consumer) Start() error {
-	ch, err := c.manager.CreateChannel()
+	ch, err := c.Manager.CreateChannel()
 	if err != nil {
 		return err
 	}
 	defer ch.Close()
 
-	msgs, err := ch.Consume(c.fila, "topic", false, false, false, false, nil)
-
+	err = ch.ExchangeDeclare(c.Fila, "topic", true, false, false, false, nil)
 	if err != nil {
 		return err
 	}
 
-	// PESQUISAR SOBRE PADRÃO STRATEGIES PARA ROTEAMENTO DE ACORDO COM TÓPICO
-	// PESQUISAR SOBRE PADRÃO ENVELOPE PARA SCHEMA DE DADOS NO AMQP (CloudEvents)
+	q, err := ch.QueueDeclare(c.Fila, true, false, false, false, nil)
+	if err != nil {
+		return err
+	}
+
+	msgs, err := ch.Consume(q.Name, "", false, false, false, false, nil)
+	if err != nil {
+		return err
+	}
+
+	log.Print("Consumer started")
+	var envelope worker.EventEnvelope
+
+	for msg := range msgs {
+		if err := json.Unmarshal(msg.Body, &envelope); err != nil {
+			log.Print("Consumer failed to unmarshal event: " + err.Error())
+		} else {
+
+			inboxModel := worker.MapInboxEventToApplication(&envelope)
+			ctx := context.Background()
+
+			if err := c.InboxRepository.Save(&ctx, inboxModel); err != nil {
+				log.Print("Consumer failed to save event: " + err.Error())
+			} else {
+
+				if err := msg.Ack(false); err != nil {
+					log.Print("Consumer failed to ack event: " + err.Error())
+				}
+			}
+		}
+	}
 
 	return nil
 }

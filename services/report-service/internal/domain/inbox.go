@@ -19,19 +19,24 @@ const (
 	InboxStatusAccepted InboxStatus = "PROCESSED"
 )
 
+type InboxEventType string
+
+const (
+	GeneratedReportEvent   InboxEventType = "EVENTS.GENERATED.REPORT"
+	RejectedReportEvent    InboxEventType = "EVENTS.REJECTED.REPORT"
+	ValidatedReportEvent   InboxEventType = "EVENTS.VALIDATED.REPORT"
+	AreaDefinedReportEvent InboxEventType = "EVENTS.AREADEFINED.REPORT"
+)
+
 type inboxPayload struct {
 }
 
-type inbox struct {
+type Inbox struct {
 	ID           uuid.UUID
-	EventType    string
+	EventType    InboxEventType
 	Status       InboxStatus
-	content      inboxPayload
-	retries      int8
-	received_at  time.Time
-	processed_at time.Time
-}
-
-func (i *inbox) Process() {
-
+	Content      []byte
+	Retries      int32
+	Received_at  time.Time
+	Processed_at time.Time
 }
