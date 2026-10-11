@@ -13,6 +13,7 @@ import (
 	"report-service/internal/infraestructure/external/BrasilNtp"
 	"report-service/internal/infraestructure/external/LatLngWorkGeocoding"
 	"report-service/internal/infraestructure/messaging/amqp"
+	"report-service/internal/infraestructure/persistence/postgres/db"
 	"report-service/internal/infraestructure/persistence/postgres/repository"
 	"syscall"
 	"time"
@@ -76,7 +77,8 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	inboxWorker1 := worker.NewInboxWorker(InboxRepository, processor1)
+	UnitOfWork := db.NewUnitOfWork(pool)
+	inboxWorker1 := worker.NewInboxWorker(InboxRepository, processor1, UnitOfWork)
 	cont := context.Background()
 	go inboxWorker1.Process(&cont)
 

@@ -9,7 +9,7 @@ import (
 
 type InboxRepository interface {
 	Save(ctx *context.Context, inbox *domain.Inbox) error
-	GetUnprocessedMessage(ctx *context.Context) (domain.Inbox, error)
+	GetUnprocessedMessage(ctx *context.Context) (*domain.Inbox, error)
 	MarkAsProcessed(ctx *context.Context, id uuid.UUID) error
 	Tx(ctx *context.Context, fn func(repository InboxRepository) error) error
 }

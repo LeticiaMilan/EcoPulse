@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"report-service/internal/domain"
+	"report-service/internal/infraestructure/entrypoint/delivery"
 	"report-service/internal/infraestructure/persistence/postgres/db"
 	"report-service/internal/ports"
 
@@ -55,9 +56,12 @@ func NewInboxRepository(pool *pgxpool.Pool) *InboxRepositoryImpl {
 	}
 }
 
-func (repo *InboxRepositoryImpl) GetUnprocessedMessage(ctx *context.Context) (domain.Inbox, error) {
-
-	return domain.Inbox{}, nil
+func (repo *InboxRepositoryImpl) GetUnprocessedMessage(ctx *context.Context) (*domain.Inbox, error) {
+	retorno, err := repo.queries.PoolUnprocessedMessage(*ctx)
+	if err != nil {
+		return nil, err
+	}
+	return delivery.MapInboxModelToApplication(&retorno), nil
 }
 
 func (repo *InboxRepositoryImpl) MarkAsProcessed(ctx *context.Context, id uuid.UUID) error {
