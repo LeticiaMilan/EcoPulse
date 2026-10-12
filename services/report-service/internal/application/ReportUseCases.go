@@ -3,7 +3,9 @@ package application
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"report-service/internal/domain"
+	"report-service/internal/infraestructure/persistence/postgres/db"
 	"report-service/internal/ports"
 	"report-service/pkg"
 	"time"
@@ -37,25 +39,23 @@ func NewProcessReportUseCase(reportRepository ports.ReportRepository, geocodingA
 	}
 }
 
-func (uc *GeneratedReportUseCase) Execute(report *domain.Report) error {
-	ctx := context.Background()
-
+func (uc *GeneratedReportUseCase) Execute(ctx context.Context, report *domain.Report, work *db.UnitOfWork) error {
 	if err := report.Validate(); err != nil {
+		log.Printf("[ReportUseCase] Execute err: %+v", err)
 		return err
 	}
+	//if err := uc.IsCoordinatesValid(&ctx, report); err != nil {
+	//	return err
+	//}
 
-	if err := uc.IsCoordinatesValid(&ctx, report); err != nil {
-		return err
-	}
-
-	if err := uc.isDatetimeValid(report, uc.clock); err != nil {
-		return err
-	}
+	//if err := uc.isDatetimeValid(report, uc.clock); err != nil {
+	//	return err
+	//}
 
 	if err := uc.ReportRepository.Create(ctx, report); err != nil {
 		return err
 	}
-
+	log.Print("Salvou no banco de dados")
 	reportDTO := ReportDTO{
 		ID:        report.ID,
 		Latitude:  report.Latitude,

@@ -15,7 +15,7 @@ import (
 
 type InboxRepositoryImpl struct {
 	pool    *pgxpool.Pool
-	queries *db.Queries
+	Queries *db.Queries
 }
 
 func NewCreateInboxParams(inbox *domain.Inbox) (*db.CreateInboxParams, error) {
@@ -24,7 +24,7 @@ func NewCreateInboxParams(inbox *domain.Inbox) (*db.CreateInboxParams, error) {
 	var ReceivedAt pgtype.Timestamptz
 	var ProcessedAt pgtype.Timestamptz
 
-	if err := pgEvent.Scan(inbox.EventType); err != nil {
+	if err := pgEvent.Scan(string(inbox.EventType)); err != nil {
 		return nil, err
 	}
 
@@ -49,15 +49,15 @@ func NewCreateInboxParams(inbox *domain.Inbox) (*db.CreateInboxParams, error) {
 	}, nil
 }
 
-func NewInboxRepository(pool *pgxpool.Pool) *InboxRepositoryImpl {
+func NewInboxRepository(pool *pgxpool.Pool, queries *db.Queries) *InboxRepositoryImpl {
 	return &InboxRepositoryImpl{
 		pool:    pool,
-		queries: db.New(pool),
+		Queries: queries,
 	}
 }
 
 func (repo *InboxRepositoryImpl) GetUnprocessedMessage(ctx *context.Context) (*domain.Inbox, error) {
-	retorno, err := repo.queries.PoolUnprocessedMessage(*ctx)
+	retorno, err := repo.Queries.PoolUnprocessedMessage(*ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -74,7 +74,7 @@ func (repo *InboxRepositoryImpl) Save(ctx *context.Context, inbox *domain.Inbox)
 	if err != nil {
 		return err
 	}
-	InboxSaved, err := repo.queries.CreateInbox(*ctx, *params)
+	InboxSaved, err := repo.Queries.CreateInbox(*ctx, *params)
 	if err != nil {
 		return err
 	}

@@ -36,51 +36,45 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	log.Print("RabbitMQ connection established")
-	InboxRepository := repository.NewInboxRepository(pool)
 
-	consumer1 := amqp.Consumer{
-		InboxRepository: InboxRepository,
-		Manager:         QueueManager,
-		Fila:            "teste",
-	}
+	InboxRepository := repository.NewInboxRepository(pool, db.New(pool))
 
-	go consumer1.Start()
-
-	var httpClient *http.Client
-	httpClient = &http.Client{
-		Timeout: 20 * time.Second,
-		Transport: &http.Transport{
-			MaxIdleConns:        100,              // Total de conexões inativas mantidas no pool
-			MaxIdleConnsPerHost: 3,                // Conexões inativas por host (padrão do Go é apenas 2)
-			IdleConnTimeout:     90 * time.Second, // Tempo que uma conexão pode ficar inativa antes de fechar
-			DialContext: (&net.Dialer{
-				Timeout:   5 * time.Second,  // Timeout para abrir a conexão TCP
-				KeepAlive: 30 * time.Second, // Frequência do Keep-Alive no nível do SO
-			}).DialContext,
-		},
-	}
-
-	ReportRepository := repository.NewReportRepository(pool)
-	GeoCodingAPI := LatLngWorkGeocoding.NewLatLngWorkGeocodingApi(httpClient)
-	BrasilNtpClock, err := BrasilNtp.NewBrasilNtpClock()
-	if err != nil {
-		log.Fatal(err)
-	}
-	reportUseCase1 := application.NewProcessReportUseCase(ReportRepository, GeoCodingAPI, BrasilNtpClock)
-	ReportGeneratedHandler := delivery.NewReportGeneratedHandler(reportUseCase1)
-	processor1 := delivery.NewInboxProcessor()
-	processor1.RegisterHandler("EVENTS.GENERATED.REPORT", ReportGeneratedHandler)
+	consumer1 := amqp.NewConsumer(QueueManager, "teste", InboxRepository, "topic")
 
 	// Escutar interrupções do S.O
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	ConsumerChannel, ReceivedMessages, err := consumer1.Start(ctx)
+	if ConsumerChannel == nil || ReceivedMessages == nil || err != nil {
+		log.Fatal("Failed to start consumer channel")
+	}
+	defer ConsumerChannel.Close()
+
+	go consumer1.Consumir(ctx, ReceivedMessages)
+	go consumer1.Consumir(ctx, ReceivedMessages)
+
+	var httpClient *http.Client
+	httpClient = ConfigHttpClient()
+
+	ReportRepository := repository.NewReportRepository(pool)
+	GeoCodingAPI := LatLngWorkGeocoding.NewLatLngWorkGeocodingApi(httpClient)
+	BrasilNtpClock, err := BrasilNtp.NewBrasilNtpClock()
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	reportUseCase1 := application.NewProcessReportUseCase(ReportRepository, GeoCodingAPI, BrasilNtpClock)
+	ReportGeneratedHandler := delivery.NewReportGeneratedHandler(reportUseCase1)
+
+	processor1 := delivery.NewInboxProcessor()
+	processor1.RegisterHandler("EVENTS.GENERATED.REPORT", ReportGeneratedHandler)
+
 	UnitOfWork := db.NewUnitOfWork(pool)
 	inboxWorker1 := worker.NewInboxWorker(InboxRepository, processor1, UnitOfWork)
-	cont := context.Background()
-	go inboxWorker1.Process(&cont)
+	go inboxWorker1.Process(ctx)
 
 	<-ctx.Done()
 }
@@ -108,4 +102,19 @@ func database() *pgxpool.Pool {
 	}
 
 	return pool
+}
+
+func ConfigHttpClient() *http.Client {
+	return &http.Client{
+		Timeout: 20 * time.Second,
+		Transport: &http.Transport{
+			MaxIdleConns:        100,              // Total de conexões inativas mantidas no pool
+			MaxIdleConnsPerHost: 3,                // Conexões inativas por host (padrão do Go é apenas 2)
+			IdleConnTimeout:     90 * time.Second, // Tempo que uma conexão pode ficar inativa antes de fechar
+			DialContext: (&net.Dialer{
+				Timeout:   5 * time.Second,  // Timeout para abrir a conexão TCP
+				KeepAlive: 30 * time.Second, // Frequência do Keep-Alive no nível do SO
+			}).DialContext,
+		},
+	}
 }

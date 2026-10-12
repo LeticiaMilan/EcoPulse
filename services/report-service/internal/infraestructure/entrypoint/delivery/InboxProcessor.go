@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"report-service/internal/domain"
+	"report-service/internal/infraestructure/persistence/postgres/db"
 )
 
 type InboxProcessor struct {
@@ -20,12 +21,12 @@ func (p *InboxProcessor) RegisterHandler(name string, handler EventHandler) {
 	p.handlers[name] = handler
 }
 
-func (p *InboxProcessor) Process(ctx context.Context, payload domain.Inbox) error {
+func (p *InboxProcessor) Process(ctx context.Context, payload domain.Inbox, work *db.UnitOfWork) error {
 	handler, exists := p.handlers[string(payload.EventType)]
 
 	if !exists {
 		return fmt.Errorf("event type %s does not exist", payload.EventType)
 	}
 
-	return handler.Handle(ctx, payload.Content)
+	return handler.Handle(ctx, payload.Content, work)
 }

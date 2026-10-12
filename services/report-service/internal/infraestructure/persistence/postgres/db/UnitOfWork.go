@@ -14,14 +14,14 @@ var (
 )
 
 type UnitOfWork struct {
-	pool    *pgxpool.Pool
+	Pool    *pgxpool.Pool
 	tx      pgx.Tx
-	queries *Queries
+	Queries *Queries
 }
 
 func NewUnitOfWork(pool *pgxpool.Pool) UnitOfWork {
 	return UnitOfWork{
-		pool: pool,
+		Pool: pool,
 	}
 }
 
@@ -30,18 +30,18 @@ func (uow *UnitOfWork) RunInTx(ctx context.Context, fn func(work UnitOfWork) err
 		return ErrTransactionAlreadyExists
 	}
 
-	if uow.pool == nil {
+	if uow.Pool == nil {
 		return ErrPoolNotInitialized
 	}
 
-	tx, err := uow.pool.Begin(ctx) // Inicia a transação
+	tx, err := uow.Pool.Begin(ctx) // Inicia a transação
 	if err != nil {
 		return err
 	}
 	txUow := &UnitOfWork{ // Finaliza instanciação da UOW (Lazy Start)
-		pool:    uow.pool,
+		Pool:    uow.Pool,
 		tx:      tx,
-		queries: New(uow.pool),
+		Queries: New(tx),
 	}
 
 	defer func() {
@@ -52,8 +52,8 @@ func (uow *UnitOfWork) RunInTx(ctx context.Context, fn func(work UnitOfWork) err
 	}()
 
 	if err := fn(*txUow); err != nil {
-		if err = tx.Rollback(ctx); err != nil {
-			return err
+		if rollbackErr := tx.Rollback(ctx); rollbackErr != nil {
+			return errors.Join(err, rollbackErr)
 		}
 		return err
 	}

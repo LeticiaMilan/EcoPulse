@@ -4,14 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"report-service/internal/application"
+	"report-service/internal/infraestructure/persistence/postgres/db"
 	"time"
 
 	"github.com/google/uuid"
 )
 
 type EventHandler interface {
-	Handle(ctx context.Context, payload []byte) error
+	Handle(ctx context.Context, payload []byte, work *db.UnitOfWork) error
 }
 
 type ReportGeneratedEventDTO struct {
@@ -31,15 +33,20 @@ func NewReportGeneratedHandler(reportUseCase *application.GeneratedReportUseCase
 	return &ReportGeneratedHandler{ReportUseCase: reportUseCase}
 }
 
-func (h *ReportGeneratedHandler) Handle(ctx context.Context, payload []byte) error {
+func (h *ReportGeneratedHandler) Handle(ctx context.Context, payload []byte, work *db.UnitOfWork) error {
 	var ReportDTO ReportGeneratedEventDTO
 
 	if err := json.Unmarshal(payload, &ReportDTO); err != nil {
 		return fmt.Errorf("cannot unmarshal payload: %w", err)
 	}
+	log.Printf("Received event type %s on GeneratedHandler", ReportDTO)
 
-	if err := h.ReportUseCase.Execute(MapReportGeneratedDTOToApplication(&ReportDTO)); err != nil {
-		return fmt.Errorf("cannot execute report: %w", err)
+	domainInbox := MapReportGeneratedDTOToApplication(&ReportDTO)
+	log.Printf("Parsed domainInbox: %s ", domainInbox)
+
+	if err := h.ReportUseCase.Execute(ctx, domainInbox, work); err != nil {
+		log.Printf("[EventHandler] Error while processing event: %w", err.Error())
+		return err
 	}
 
 	return nil
