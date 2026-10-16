@@ -13,7 +13,6 @@ import (
 	"report-service/internal/infraestructure/external/BrasilNtp"
 	"report-service/internal/infraestructure/external/LatLngWorkGeocoding"
 	"report-service/internal/infraestructure/messaging/amqp"
-	"report-service/internal/infraestructure/persistence/postgres/db"
 	"report-service/internal/infraestructure/persistence/postgres/repository"
 	"syscall"
 	"time"
@@ -38,8 +37,8 @@ func main() {
 	}
 	log.Print("RabbitMQ connection established")
 
-	InboxRepository := repository.NewInboxRepository(pool, db.New(pool))
-
+	InboxRepository := repository.NewInboxRepository(pool)
+	OutboxRepository := repository.NewOutboxRepository(pool)
 	consumer1 := amqp.NewConsumer(QueueManager, "teste", InboxRepository, "topic")
 
 	// Escutar interrupções do S.O
@@ -66,14 +65,13 @@ func main() {
 		log.Fatal(err)
 	}
 
-	reportUseCase1 := application.NewProcessReportUseCase(ReportRepository, GeoCodingAPI, BrasilNtpClock)
+	reportUseCase1 := application.NewProcessReportUseCase(ReportRepository, GeoCodingAPI, BrasilNtpClock, OutboxRepository)
 	ReportGeneratedHandler := delivery.NewReportGeneratedHandler(reportUseCase1)
 
 	processor1 := delivery.NewInboxProcessor()
 	processor1.RegisterHandler("EVENTS.GENERATED.REPORT", ReportGeneratedHandler)
 
-	UnitOfWork := db.NewUnitOfWork(pool)
-	inboxWorker1 := worker.NewInboxWorker(InboxRepository, processor1, UnitOfWork)
+	inboxWorker1 := worker.NewInboxWorker(InboxRepository, processor1)
 	go inboxWorker1.Process(ctx)
 
 	<-ctx.Done()

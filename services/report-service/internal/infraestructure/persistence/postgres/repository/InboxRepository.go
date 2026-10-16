@@ -6,9 +6,9 @@ import (
 	"report-service/internal/domain"
 	"report-service/internal/infraestructure/entrypoint/delivery"
 	"report-service/internal/infraestructure/persistence/postgres/db"
-	"report-service/internal/ports"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -49,15 +49,16 @@ func NewCreateInboxParams(inbox *domain.Inbox) (*db.CreateInboxParams, error) {
 	}, nil
 }
 
-func NewInboxRepository(pool *pgxpool.Pool, queries *db.Queries) *InboxRepositoryImpl {
+func NewInboxRepository(pool *pgxpool.Pool) *InboxRepositoryImpl {
 	return &InboxRepositoryImpl{
 		pool:    pool,
-		Queries: queries,
+		Queries: db.New(pool),
 	}
 }
 
-func (repo *InboxRepositoryImpl) GetUnprocessedMessage(ctx *context.Context) (*domain.Inbox, error) {
-	retorno, err := repo.Queries.PoolUnprocessedMessage(*ctx)
+func (repo *InboxRepositoryImpl) GetUnprocessedMessage(ctx context.Context) (*domain.Inbox, error) {
+	Query := repo.GetExecutor(ctx)
+	retorno, err := Query.PoolUnprocessedMessage(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -65,16 +66,16 @@ func (repo *InboxRepositoryImpl) GetUnprocessedMessage(ctx *context.Context) (*d
 }
 
 func (repo *InboxRepositoryImpl) MarkAsProcessed(ctx *context.Context, id uuid.UUID) error {
-
 	return nil
 }
 
-func (repo *InboxRepositoryImpl) Save(ctx *context.Context, inbox *domain.Inbox) error {
+func (repo *InboxRepositoryImpl) Save(ctx context.Context, inbox *domain.Inbox) error {
 	params, err := NewCreateInboxParams(inbox)
 	if err != nil {
 		return err
 	}
-	InboxSaved, err := repo.Queries.CreateInbox(*ctx, *params)
+	Query := repo.GetExecutor(ctx)
+	InboxSaved, err := Query.CreateInbox(ctx, *params)
 	if err != nil {
 		return err
 	}
@@ -82,12 +83,17 @@ func (repo *InboxRepositoryImpl) Save(ctx *context.Context, inbox *domain.Inbox)
 	return nil
 }
 
-func (repo *InboxRepositoryImpl) Tx(ctx *context.Context, fn func(repository ports.InboxRepository) error) error {
-	tx, err := repo.pool.Begin(*ctx)
-	if err != nil {
-		return err
+func (repo *InboxRepositoryImpl) GetExecutor(ctx context.Context) *db.Queries {
+	if tx, ok := ctx.Value("tx").(pgx.Tx); ok {
+		return db.New(repo.pool).WithTx(tx)
 	}
-	defer tx.Rollback(*ctx)
+	return repo.Queries
+}
 
-	return nil
+func (repo *InboxRepositoryImpl) BeginTransaction(ctx context.Context) (pgx.Tx, error) {
+	tx, err := repo.pool.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return tx, nil
 }

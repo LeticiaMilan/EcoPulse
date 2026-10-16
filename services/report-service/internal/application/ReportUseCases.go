@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"log"
 	"report-service/internal/domain"
-	"report-service/internal/infraestructure/persistence/postgres/db"
 	"report-service/internal/ports"
 	"report-service/pkg"
 	"time"
@@ -31,15 +30,16 @@ type GeneratedReportUseCase struct {
 	clock            ports.BrasilClock
 }
 
-func NewProcessReportUseCase(reportRepository ports.ReportRepository, geocodingAPI ports.GeocodingAPI, clock ports.BrasilClock) *GeneratedReportUseCase {
+func NewProcessReportUseCase(reportRepository ports.ReportRepository, geocodingAPI ports.GeocodingAPI, clock ports.BrasilClock, OutboxRepository ports.OutboxRepository) *GeneratedReportUseCase {
 	return &GeneratedReportUseCase{
 		ReportRepository: reportRepository,
 		GeocodingAPI:     geocodingAPI,
 		clock:            clock,
+		OutboxRepository: OutboxRepository,
 	}
 }
 
-func (uc *GeneratedReportUseCase) Execute(ctx context.Context, report *domain.Report, work *db.UnitOfWork) error {
+func (uc *GeneratedReportUseCase) Execute(ctx context.Context, report *domain.Report) error {
 	if err := report.Validate(); err != nil {
 		log.Printf("[ReportUseCase] Execute err: %+v", err)
 		return err
@@ -81,8 +81,8 @@ func (uc *GeneratedReportUseCase) Execute(ctx context.Context, report *domain.Re
 		Created_at:   time.Now(),
 		Processed_at: time.Time{},
 	}
-
-	if err := uc.OutboxRepository.Save(&ctx, &outbox); err != nil {
+	log.Printf("Before saving outbox %+v", outbox)
+	if err := uc.OutboxRepository.Save(ctx, outbox); err != nil {
 		return err
 	}
 

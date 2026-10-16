@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -25,7 +26,7 @@ type ReportPostgresModel struct {
 
 type ReportRepositoryImpl struct {
 	pool    *pgxpool.Pool
-	queries *db.Queries
+	Queries *db.Queries
 }
 
 func newCreateReportParams(report *domain.Report) db.CreateReportParams {
@@ -39,13 +40,13 @@ func newCreateReportParams(report *domain.Report) db.CreateReportParams {
 	if err := lng.Scan(report.Longitude); err != nil {
 		log.Print("Error parsing longitude")
 	}
-	if err := Type.Scan(report.Type); err != nil {
+	if err := Type.Scan(string(report.Type)); err != nil {
 		log.Print("Error parsing type")
 	}
 	if err := datetime.Scan(report.Datetime); err != nil {
 		log.Print("Error parsing datetime")
 	}
-	if err := status.Scan(report.Status); err != nil {
+	if err := status.Scan(string(report.Status)); err != nil {
 		log.Print("Error parsing status")
 	}
 	return db.CreateReportParams{
@@ -62,13 +63,14 @@ func newCreateReportParams(report *domain.Report) db.CreateReportParams {
 func NewReportRepository(pool *pgxpool.Pool) *ReportRepositoryImpl {
 	return &ReportRepositoryImpl{
 		pool:    pool,
-		queries: db.New(pool),
+		Queries: db.New(pool),
 	}
 }
 
 func (r *ReportRepositoryImpl) Create(ctx context.Context, report *domain.Report) error {
 	ReportParams := newCreateReportParams(report)
-	createReport, err := r.queries.CreateReport(ctx, ReportParams)
+	Query := r.GetExecutor(ctx)
+	createReport, err := Query.CreateReport(ctx, ReportParams)
 	if err != nil {
 		return err
 	}
@@ -78,4 +80,19 @@ func (r *ReportRepositoryImpl) Create(ctx context.Context, report *domain.Report
 
 func (r *ReportRepositoryImpl) Update(ctx context.Context, report *domain.Report) error {
 	return nil
+}
+
+func (r *ReportRepositoryImpl) GetExecutor(ctx context.Context) *db.Queries {
+	if tx, ok := ctx.Value("tx").(pgx.Tx); ok {
+		return db.New(r.pool).WithTx(tx)
+	}
+	return r.Queries
+}
+
+func (r *ReportRepositoryImpl) BeginTransaction(ctx context.Context) (pgx.Tx, error) {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return tx, nil
 }

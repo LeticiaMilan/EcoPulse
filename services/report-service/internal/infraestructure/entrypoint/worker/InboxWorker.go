@@ -2,25 +2,24 @@ package worker
 
 import (
 	"context"
+	"errors"
 	"log"
 	"report-service/internal/infraestructure/entrypoint/delivery"
-	"report-service/internal/infraestructure/persistence/postgres/db"
-	"report-service/internal/infraestructure/persistence/postgres/repository"
 	"report-service/internal/ports"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 )
 
 type InboxWorker struct {
 	Processor  *delivery.InboxProcessor
 	Repository ports.InboxRepository
-	UnitOfWork db.UnitOfWork
 }
 
-func NewInboxWorker(repository ports.InboxRepository, processor *delivery.InboxProcessor, UnitOfWork db.UnitOfWork) *InboxWorker {
+func NewInboxWorker(repository ports.InboxRepository, processor *delivery.InboxProcessor) *InboxWorker {
 	return &InboxWorker{
 		Processor:  processor,
 		Repository: repository,
-		UnitOfWork: UnitOfWork,
 	}
 }
 
@@ -28,20 +27,45 @@ func (i *InboxWorker) Process(ctx context.Context) error {
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 	for range ticker.C {
+		if err := i.Run(ctx); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
-		return i.UnitOfWork.RunInTx(ctx, func(work db.UnitOfWork) error {
-			inboxRepository := repository.NewInboxRepository(work.Pool, work.Queries)
+func (i *InboxWorker) Run(ctx context.Context) error {
 
-			inbox, _ := inboxRepository.GetUnprocessedMessage(&ctx)
-			if inbox == nil {
+	tx, err := i.Repository.BeginTransaction(ctx)
+	if err != nil {
+		return err
+	}
+	var executando bool
+	defer func() {
+		if executando {
+			if err := tx.Rollback(ctx); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
+				log.Print("Error while rolling back transaction")
 			} else {
-				if err := i.Processor.Process(ctx, *inbox, &work); err != nil {
-					log.Printf("[Worker] Process err: %+v", err)
-					return err
-				}
+				log.Println("Transaction rollback")
 			}
-			return nil
-		})
+		}
+	}()
+
+	txCtx := context.WithValue(ctx, "tx", tx)
+	inbox, _ := i.Repository.GetUnprocessedMessage(txCtx)
+	if inbox == nil {
+	} else {
+		executando = true
+		if err := i.Processor.Process(txCtx, *inbox); err != nil {
+			log.Printf("[Worker] Process err: %+v", err)
+			return err
+		}
+		log.Println("Done processing inbox")
+
+		if err := tx.Commit(ctx); err != nil {
+			log.Printf("[Worker] Commit err: %+v", err)
+		}
+		log.Println("Transaction commit")
 	}
 	return nil
 }

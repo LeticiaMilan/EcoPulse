@@ -73,7 +73,7 @@ func (c *Consumer) Consumir(ctx context.Context, msgs <-chan amqp.Delivery) erro
 			continue
 		} else {
 			inboxModel := worker.MapInboxEventToApplication(&envelope)
-			if err := c.InboxRepository.Save(&ctx, inboxModel); err != nil {
+			if err := c.InboxRepository.Save(ctx, inboxModel); err != nil {
 				log.Print("Consumer failed to save event: " + err.Error())
 				if err := msg.Nack(false, false); err != nil {
 					log.Print("Consumer failed to nack event: " + err.Error())

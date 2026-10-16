@@ -6,14 +6,13 @@ import (
 	"fmt"
 	"log"
 	"report-service/internal/application"
-	"report-service/internal/infraestructure/persistence/postgres/db"
 	"time"
 
 	"github.com/google/uuid"
 )
 
 type EventHandler interface {
-	Handle(ctx context.Context, payload []byte, work *db.UnitOfWork) error
+	Handle(ctx context.Context, payload []byte) error
 }
 
 type ReportGeneratedEventDTO struct {
@@ -33,7 +32,7 @@ func NewReportGeneratedHandler(reportUseCase *application.GeneratedReportUseCase
 	return &ReportGeneratedHandler{ReportUseCase: reportUseCase}
 }
 
-func (h *ReportGeneratedHandler) Handle(ctx context.Context, payload []byte, work *db.UnitOfWork) error {
+func (h *ReportGeneratedHandler) Handle(ctx context.Context, payload []byte) error {
 	var ReportDTO ReportGeneratedEventDTO
 
 	if err := json.Unmarshal(payload, &ReportDTO); err != nil {
@@ -44,7 +43,7 @@ func (h *ReportGeneratedHandler) Handle(ctx context.Context, payload []byte, wor
 	domainInbox := MapReportGeneratedDTOToApplication(&ReportDTO)
 	log.Printf("Parsed domainInbox: %s ", domainInbox)
 
-	if err := h.ReportUseCase.Execute(ctx, domainInbox, work); err != nil {
+	if err := h.ReportUseCase.Execute(ctx, domainInbox); err != nil {
 		log.Printf("[EventHandler] Error while processing event: %w", err.Error())
 		return err
 	}

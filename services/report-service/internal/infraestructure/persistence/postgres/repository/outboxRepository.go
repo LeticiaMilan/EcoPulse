@@ -7,6 +7,7 @@ import (
 	"report-service/internal/infraestructure/persistence/postgres/db"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -16,13 +17,13 @@ type OutboxRepositoryImpl struct {
 	queries *db.Queries
 }
 
-func NewCreateOutboxParams(outbox *domain.Outbox) (*db.CreateOutboxParams, error) {
+func NewCreateOutboxParams(outbox domain.Outbox) (*db.CreateOutboxParams, error) {
 	var pgEvent pgtype.Text
 	var pgStatus pgtype.Text
 	var CreatedAt pgtype.Timestamptz
 	var ProcessedAt pgtype.Timestamptz
 
-	if err := pgEvent.Scan(outbox.EventType); err != nil {
+	if err := pgEvent.Scan(string(outbox.EventType)); err != nil {
 		return nil, err
 	}
 
@@ -47,6 +48,12 @@ func NewCreateOutboxParams(outbox *domain.Outbox) (*db.CreateOutboxParams, error
 	}, nil
 }
 
+func NewOutboxRepository(pool *pgxpool.Pool) *OutboxRepositoryImpl {
+	return &OutboxRepositoryImpl{
+		pool:    pool,
+		queries: db.New(pool),
+	}
+}
 func (repo *OutboxRepositoryImpl) GetUnprocessedMessage(ctx *context.Context) (domain.Outbox, error) {
 
 	return domain.Outbox{}, nil
@@ -57,15 +64,32 @@ func (repo *OutboxRepositoryImpl) MarkAsProcessed(ctx *context.Context, id uuid.
 	return nil
 }
 
-func (repo *OutboxRepositoryImpl) Save(ctx *context.Context, outbox *domain.Outbox) error {
+func (repo *OutboxRepositoryImpl) Save(ctx context.Context, outbox domain.Outbox) error {
+	log.Printf("Saving outbox %+v", outbox)
 	params, err := NewCreateOutboxParams(outbox)
 	if err != nil {
 		return err
 	}
-	InboxSaved, err := repo.queries.CreateOutbox(*ctx, *params)
+	Query := repo.GetExecutor(ctx)
+	OutboxSaved, err := Query.CreateOutbox(ctx, *params)
 	if err != nil {
 		return err
 	}
-	log.Print(InboxSaved)
+	log.Printf("Saved outbox %+v", OutboxSaved)
 	return nil
+}
+
+func (repo *OutboxRepositoryImpl) GetExecutor(ctx context.Context) *db.Queries {
+	if tx, ok := ctx.Value("tx").(pgx.Tx); ok {
+		return db.New(repo.pool).WithTx(tx)
+	}
+	return repo.queries
+}
+
+func (repo *OutboxRepositoryImpl) BeginTransaction(ctx context.Context) (pgx.Tx, error) {
+	tx, err := repo.pool.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return tx, nil
 }
