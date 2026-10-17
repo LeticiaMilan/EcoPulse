@@ -8,17 +8,20 @@ import (
 	"os"
 	"os/signal"
 	"report-service/internal/application"
+	"report-service/internal/domain"
 	"report-service/internal/infraestructure/entrypoint/delivery"
 	"report-service/internal/infraestructure/entrypoint/worker"
 	"report-service/internal/infraestructure/external/BrasilNtp"
 	"report-service/internal/infraestructure/external/LatLngWorkGeocoding"
 	"report-service/internal/infraestructure/messaging/amqp"
 	"report-service/internal/infraestructure/persistence/postgres/repository"
+	"report-service/internal/ports"
 	"syscall"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/joho/godotenv/autoload"
+	"github.com/rabbitmq/amqp091-go"
 )
 
 func main() {
@@ -26,53 +29,35 @@ func main() {
 	defer pool.Close()
 	log.Println("Database connection established")
 
-	con := os.Getenv("AMQP_URL")
-	if con == "" {
-		log.Fatal("AMQP_URL environment variable is required")
-	}
-	QueueManager, err := amqp.NewEventManager(con)
-
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.Print("RabbitMQ connection established")
-
 	InboxRepository := repository.NewInboxRepository(pool)
 	OutboxRepository := repository.NewOutboxRepository(pool)
-	consumer1 := amqp.NewConsumer(QueueManager, "teste", InboxRepository, "topic")
+	ReportRepository := repository.NewReportRepository(pool)
 
 	// Escutar interrupções do S.O
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-
-	ConsumerChannel, ReceivedMessages, err := consumer1.Start(ctx)
-	if ConsumerChannel == nil || ReceivedMessages == nil || err != nil {
-		log.Fatal("Failed to start consumer channel")
-	}
+	dispatcherChan := make(chan worker.EventEnvelope, 100)
+	ConsumerChannel := StartRabbit(ctx, InboxRepository, OutboxRepository, dispatcherChan)
 	defer ConsumerChannel.Close()
-
-	go consumer1.Consumir(ctx, ReceivedMessages)
-	go consumer1.Consumir(ctx, ReceivedMessages)
 
 	var httpClient *http.Client
 	httpClient = ConfigHttpClient()
-
-	ReportRepository := repository.NewReportRepository(pool)
 	GeoCodingAPI := LatLngWorkGeocoding.NewLatLngWorkGeocodingApi(httpClient)
 	BrasilNtpClock, err := BrasilNtp.NewBrasilNtpClock()
-
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	reportUseCase1 := application.NewProcessReportUseCase(ReportRepository, GeoCodingAPI, BrasilNtpClock, OutboxRepository)
-	ReportGeneratedHandler := delivery.NewReportGeneratedHandler(reportUseCase1)
+	reportUseCase := application.NewProcessReportUseCase(ReportRepository, GeoCodingAPI, BrasilNtpClock, OutboxRepository)
+	ReportGeneratedHandler := delivery.NewReportGeneratedHandler(reportUseCase)
 
-	processor1 := delivery.NewInboxProcessor()
-	processor1.RegisterHandler("EVENTS.GENERATED.REPORT", ReportGeneratedHandler)
+	Inboxprocessor := delivery.NewInboxProcessor()
+	Inboxprocessor.RegisterHandler(string(domain.InboxGeneratedReportEvent), ReportGeneratedHandler)
 
-	inboxWorker1 := worker.NewInboxWorker(InboxRepository, processor1)
-	go inboxWorker1.Process(ctx)
+	OutboxWorker := worker.NewOutboxWorker(OutboxRepository, dispatcherChan)
+	inboxWorker := worker.NewInboxWorker(InboxRepository, Inboxprocessor)
+	go inboxWorker.Process(ctx)
+	go OutboxWorker.Process(ctx)
 
 	<-ctx.Done()
 }
@@ -115,4 +100,36 @@ func ConfigHttpClient() *http.Client {
 			}).DialContext,
 		},
 	}
+}
+
+func StartRabbit(ctx context.Context, inboxRepository ports.InboxRepository, outboxRepository ports.OutboxRepository, dispatcherChan chan worker.EventEnvelope) *amqp091.Channel {
+	con := os.Getenv("AMQP_URL")
+	if con == "" {
+		log.Fatal("AMQP_URL environment variable is required")
+	}
+	QueueManager, err := amqp.NewEventManager(con)
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Print("RabbitMQ connection established")
+
+	var RoutingKeys []string
+	RoutingKeys = append(RoutingKeys, string(domain.InboxGeneratedReportEvent))
+
+	consumer := amqp.NewConsumer(QueueManager, inboxRepository, "exchange.ecopulse", "topic", "queue.service.report", RoutingKeys)
+	ConsumerChannel, ReceivedMessages, err := consumer.Start()
+
+	dispatcher := amqp.NewDispatcher(QueueManager, outboxRepository, "exchange.ecopulse", "topic")
+	err = dispatcher.Start(ctx, dispatcherChan)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if ConsumerChannel == nil || ReceivedMessages == nil || err != nil {
+		log.Fatal("Failed to start consumer channel")
+	}
+
+	go consumer.Consumir(ctx, ReceivedMessages)
+	go consumer.Consumir(ctx, ReceivedMessages)
+
+	return ConsumerChannel
 }

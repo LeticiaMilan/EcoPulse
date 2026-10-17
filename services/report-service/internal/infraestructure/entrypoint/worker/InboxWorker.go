@@ -26,12 +26,17 @@ func NewInboxWorker(repository ports.InboxRepository, processor *delivery.InboxP
 func (i *InboxWorker) Process(ctx context.Context) error {
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
-	for range ticker.C {
-		if err := i.Run(ctx); err != nil {
-			return err
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+			log.Printf("Processing inbox")
+			if err := i.Run(ctx); err != nil {
+				return err
+			}
 		}
 	}
-	return nil
 }
 
 func (i *InboxWorker) Run(ctx context.Context) error {

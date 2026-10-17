@@ -21,6 +21,18 @@ func MapInboxModelToApplication(inboxModel *db.Inbox) *domain.Inbox {
 	}
 }
 
+func MapOutboxModelToApplication(outboxModel *db.Outbox) *domain.Outbox {
+	return &domain.Outbox{
+		ID:           outboxModel.ID,
+		EventType:    domain.OutboxEventType(outboxModel.EventType.String),
+		Status:       domain.OutboxStatus(outboxModel.Status.String),
+		Content:      outboxModel.Content,
+		Retries:      outboxModel.Retries,
+		Created_at:   outboxModel.CreatedAt.Time,
+		Processed_at: outboxModel.ProcessedAt.Time,
+	}
+}
+
 func MapReportGeneratedDTOToApplication(dto *ReportGeneratedEventDTO) *domain.Report {
 	return &domain.Report{
 		ID:        dto.ID,

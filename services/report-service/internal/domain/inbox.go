@@ -22,14 +22,11 @@ const (
 type InboxEventType string
 
 const (
-	GeneratedReportEvent   InboxEventType = "EVENTS.GENERATED.REPORT"
-	RejectedReportEvent    InboxEventType = "EVENTS.REJECTED.REPORT"
-	ValidatedReportEvent   InboxEventType = "EVENTS.VALIDATED.REPORT"
-	AreaDefinedReportEvent InboxEventType = "EVENTS.AREADEFINED.REPORT"
+	InboxGeneratedReportEvent   InboxEventType = "EVENTS.REPORT.GENERATED"
+	InboxRejectedReportEvent    InboxEventType = "EVENTS.REPORT.REJECTED"
+	InboxValidatedReportEvent   InboxEventType = "EVENTS.REPORT.VALIDATED"
+	InboxAreaDefinedReportEvent InboxEventType = "EVENTS.REPORT.AREADEFINED"
 )
-
-type inboxPayload struct {
-}
 
 type Inbox struct {
 	ID           uuid.UUID

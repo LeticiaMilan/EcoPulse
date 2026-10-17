@@ -3,7 +3,6 @@ package amqp
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log"
 	"report-service/internal/infraestructure/entrypoint/worker"
 	"report-service/internal/ports"
@@ -14,56 +13,61 @@ import (
 type Consumer struct {
 	InboxRepository ports.InboxRepository
 	Manager         *QueueManager
-	Fila            string
+	QueueName       string
 	ExchangeName    string
+	ExchangeKind    string
+	RoutingKeys     []string
 }
 
-func NewConsumer(manager *QueueManager, fila string, inboxRepository ports.InboxRepository, ExchangeName string) *Consumer {
+func NewConsumer(manager *QueueManager, inboxRepository ports.InboxRepository, ExchangeName string, ExchangeKind string, QueueName string, RoutingKeys []string) *Consumer {
 	return &Consumer{
 		Manager:         manager,
-		Fila:            fila,
-		InboxRepository: inboxRepository,
 		ExchangeName:    ExchangeName,
+		InboxRepository: inboxRepository,
+		ExchangeKind:    ExchangeKind,
+		QueueName:       QueueName,
+		RoutingKeys:     RoutingKeys,
 	}
 }
 
-func (c *Consumer) Start(ctx context.Context) (*amqp.Channel, <-chan amqp.Delivery, error) {
+func (c *Consumer) Start() (*amqp.Channel, <-chan amqp.Delivery, error) {
 
 	ch, err := c.Manager.CreateChannel()
 	if err != nil {
 		return nil, nil, err
 	}
-	log.Printf("Channel created")
-	err = ch.ExchangeDeclare(c.Fila, c.ExchangeName, true, false, false, false, nil)
+
+	err = ch.ExchangeDeclare(c.ExchangeName, c.ExchangeKind, true, false, false, false, nil)
 	if err != nil {
 		return nil, nil, err
 	}
-	log.Printf("Exchange Declared")
+
 	if err := ch.Qos(10, 0, false); err != nil {
 		return nil, nil, err
 	}
-	log.Printf("QoS Defined")
-	q, err := ch.QueueDeclare(c.Fila, true, false, false, false, nil)
+
+	q, err := ch.QueueDeclare(c.QueueName, true, false, false, false, nil)
 	if err != nil {
 		return nil, nil, err
 	}
-	log.Printf("Queue Declared")
-	if err := ch.QueueBind(c.Fila, "#", c.Fila, false, nil); err != nil {
-		fmt.Printf(err.Error())
-		return nil, nil, err
+
+	for _, RoutingKey := range c.RoutingKeys {
+		if err := ch.QueueBind(c.QueueName, RoutingKey, c.ExchangeName, false, nil); err != nil {
+			return nil, nil, err
+		}
 	}
-	log.Printf("Queue Binded")
+
 	msgs, err := ch.Consume(q.Name, "", false, false, false, false, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	log.Print("Consumer started")
 	return ch, msgs, nil
 }
 
 func (c *Consumer) Consumir(ctx context.Context, msgs <-chan amqp.Delivery) error {
 	for msg := range msgs {
+
 		var envelope worker.EventEnvelope
 		if err := json.Unmarshal(msg.Body, &envelope); err != nil {
 			log.Print("Consumer failed to unmarshal event: " + err.Error())
@@ -72,6 +76,7 @@ func (c *Consumer) Consumir(ctx context.Context, msgs <-chan amqp.Delivery) erro
 			}
 			continue
 		} else {
+			envelope.Type = msg.RoutingKey
 			inboxModel := worker.MapInboxEventToApplication(&envelope)
 			if err := c.InboxRepository.Save(ctx, inboxModel); err != nil {
 				log.Print("Consumer failed to save event: " + err.Error())

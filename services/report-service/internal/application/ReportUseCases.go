@@ -73,8 +73,8 @@ func (uc *GeneratedReportUseCase) Execute(ctx context.Context, report *domain.Re
 	}
 
 	outbox := domain.Outbox{
-		ID:           report.ID,
-		EventType:    "EVENTS.CREATED.REPORT",
+		ID:           uuid.New(),
+		EventType:    domain.OutboxReportCreated,
 		Status:       domain.OutboxStatusPending,
 		Content:      content,
 		Retries:      0,

@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"report-service/internal/domain"
+	"report-service/internal/infraestructure/entrypoint/delivery"
 	"report-service/internal/infraestructure/persistence/postgres/db"
 
 	"github.com/google/uuid"
@@ -54,13 +55,21 @@ func NewOutboxRepository(pool *pgxpool.Pool) *OutboxRepositoryImpl {
 		queries: db.New(pool),
 	}
 }
-func (repo *OutboxRepositoryImpl) GetUnprocessedMessage(ctx *context.Context) (domain.Outbox, error) {
-
-	return domain.Outbox{}, nil
+func (repo *OutboxRepositoryImpl) GetUnprocessedMessage(ctx context.Context) (*domain.Outbox, error) {
+	Query := repo.GetExecutor(ctx)
+	retorno, err := Query.PoolUnprocessedOutboxMessage(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return delivery.MapOutboxModelToApplication(&retorno), nil
 }
 
-func (repo *OutboxRepositoryImpl) MarkAsProcessed(ctx *context.Context, id uuid.UUID) error {
-
+func (repo *OutboxRepositoryImpl) MarkAsProcessed(ctx context.Context, id uuid.UUID) error {
+	Query := repo.GetExecutor(ctx)
+	_, err := Query.MarkOutboxAsProcessed(ctx, id)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 

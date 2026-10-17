@@ -11,8 +11,8 @@ import (
 
 type OutboxRepository interface {
 	Save(ctx context.Context, outbox domain.Outbox) error
-	GetUnprocessedMessage(ctx *context.Context) (domain.Outbox, error)
-	MarkAsProcessed(ctx *context.Context, id uuid.UUID) error
+	GetUnprocessedMessage(ctx context.Context) (*domain.Outbox, error)
+	MarkAsProcessed(ctx context.Context, id uuid.UUID) error
 	GetExecutor(ctx context.Context) *db.Queries
 	BeginTransaction(ctx context.Context) (pgx.Tx, error)
 }

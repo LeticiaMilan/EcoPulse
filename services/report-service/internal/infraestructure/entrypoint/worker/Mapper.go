@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 type EventEnvelope struct {
@@ -15,6 +16,7 @@ type EventEnvelope struct {
 	Time        time.Time       `json:"time"`
 	ContentType string          `json:"contentType"`
 	Data        json.RawMessage `json:"data"`
+	Tx          pgx.Tx
 }
 
 func MapInboxEventToApplication(EventEnvelope *EventEnvelope) *domain.Inbox {
@@ -31,12 +33,12 @@ func MapInboxEventToApplication(EventEnvelope *EventEnvelope) *domain.Inbox {
 	return inboxRetorno
 }
 
-func mapOutboxEventToEnvelope(outbox *domain.Outbox) *EventEnvelope {
-	eventEnvelope := &EventEnvelope{
-		ID:          uuid.New(),
-		Source:      "eco-pulse/report-service",
+func mapOutboxEventToEnvelope(outbox *domain.Outbox) EventEnvelope {
+	eventEnvelope := EventEnvelope{
+		ID:          outbox.ID,
+		Source:      "SERVICE.REPORT",
 		Type:        string(outbox.EventType),
-		Time:        time.Time{},
+		Time:        time.Now(),
 		ContentType: "application/json",
 		Data:        outbox.Content,
 	}

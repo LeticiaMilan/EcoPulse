@@ -15,6 +15,11 @@ const (
 )
 
 type OutboxEventType string
+
+const (
+	OutboxReportCreated OutboxEventType = "EVENTS.REPORT.CREATED"
+)
+
 type Outbox struct {
 	ID           uuid.UUID
 	EventType    OutboxEventType

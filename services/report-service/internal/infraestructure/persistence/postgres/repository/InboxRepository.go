@@ -58,7 +58,7 @@ func NewInboxRepository(pool *pgxpool.Pool) *InboxRepositoryImpl {
 
 func (repo *InboxRepositoryImpl) GetUnprocessedMessage(ctx context.Context) (*domain.Inbox, error) {
 	Query := repo.GetExecutor(ctx)
-	retorno, err := Query.PoolUnprocessedMessage(ctx)
+	retorno, err := Query.PoolUnprocessedInboxMessage(ctx)
 	if err != nil {
 		return nil, err
 	}
