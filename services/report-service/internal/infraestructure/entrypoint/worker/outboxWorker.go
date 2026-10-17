@@ -21,13 +21,12 @@ func (o *OutboxWorker) Process(ctx context.Context) error {
 	defer ticker.Stop()
 	for {
 		select {
-
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-ticker.C:
 			log.Printf("Processing outbox")
 			if err := o.run(ctx); err != nil {
-				return err
+				log.Printf("Error processing outbox: %v", err)
 			}
 		}
 	}
@@ -42,6 +41,7 @@ func (o *OutboxWorker) run(ctx context.Context) error {
 
 	outbox, err := o.Repository.GetUnprocessedMessage(txCtx)
 	if outbox == nil {
+		tx.Rollback(ctx)
 	} else {
 		if err != nil {
 			tx.Rollback(ctx)
@@ -50,7 +50,6 @@ func (o *OutboxWorker) run(ctx context.Context) error {
 		eventEnvelope := mapOutboxEventToEnvelope(outbox)
 		eventEnvelope.Tx = tx
 		o.canal <- eventEnvelope
-		close(o.canal)
 	}
 	return nil
 }

@@ -1,17 +1,12 @@
 package domain
 
 import (
-	"errors"
 	"time"
 
 	"github.com/google/uuid"
 )
 
 type InboxStatus string
-
-var (
-	ErrInboxProcessingFailed = errors.New("inbox processing failed")
-)
 
 const (
 	InboxStatusPending  InboxStatus = "PENDING"
@@ -36,4 +31,5 @@ type Inbox struct {
 	Retries      int32
 	Received_at  time.Time
 	Processed_at time.Time
+	Next_attempt time.Time
 }

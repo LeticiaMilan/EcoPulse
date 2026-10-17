@@ -66,35 +66,38 @@ func (c *Consumer) Start() (*amqp.Channel, <-chan amqp.Delivery, error) {
 }
 
 func (c *Consumer) Consumir(ctx context.Context, msgs <-chan amqp.Delivery) error {
-	for msg := range msgs {
-
-		var envelope worker.EventEnvelope
-		if err := json.Unmarshal(msg.Body, &envelope); err != nil {
-			log.Print("Consumer failed to unmarshal event: " + err.Error())
-			if err := msg.Nack(false, false); err != nil {
-				log.Print("Consumer failed to nack event: " + err.Error())
-			}
-			continue
-		} else {
-			envelope.Type = msg.RoutingKey
-			inboxModel := worker.MapInboxEventToApplication(&envelope)
-			if err := c.InboxRepository.Save(ctx, inboxModel); err != nil {
-				log.Print("Consumer failed to save event: " + err.Error())
-				if err := msg.Nack(false, false); err != nil {
-					log.Print("Consumer failed to nack event: " + err.Error())
+	go func() error {
+		for {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case msg, ok := <-msgs:
+				if !ok {
+					log.Printf("Consumer channel closed")
 				}
-				continue
-			} else {
+				log.Printf("Received message: %s", msg.Body)
+				var envelope worker.EventEnvelope
+				if err := json.Unmarshal(msg.Body, &envelope); err != nil {
+					log.Print("Consumer failed to unmarshal event: " + err.Error())
+					_ = msg.Nack(false, false)
+					continue
+				}
+
+				envelope.RoutingKey = msg.RoutingKey
+				inboxModel := worker.MapInboxEventToApplication(envelope)
+				log.Printf("Mapped inbox model: %+v", inboxModel)
+				if err := c.InboxRepository.Save(ctx, inboxModel); err != nil {
+					log.Print("Consumer failed to save event: " + err.Error())
+					_ = msg.Nack(false, false)
+					continue
+				}
 				if err := msg.Ack(false); err != nil {
 					log.Print("Consumer failed to ack event: " + err.Error())
-
-					if err := msg.Nack(false, false); err != nil {
-						log.Print("Consumer failed to nack event: " + err.Error())
-					}
 					continue
 				}
 			}
 		}
-	}
+	}()
+
 	return nil
 }

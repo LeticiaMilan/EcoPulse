@@ -68,7 +68,7 @@ func (d *Dispatcher) Start(ctx context.Context, canal <-chan worker.EventEnvelop
 
 				log.Printf("Publishing canal message to queue, %v", string(encoded))
 
-				errPublish := ch.PublishWithContext(pubCtx, d.ExchangeName, msg.Type, false, false,
+				errPublish := ch.PublishWithContext(pubCtx, d.ExchangeName, msg.RoutingKey, false, false,
 					amqp091.Publishing{
 						ContentType: "application/json",
 						Body:        encoded,

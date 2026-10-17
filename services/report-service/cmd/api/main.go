@@ -55,7 +55,7 @@ func main() {
 	Inboxprocessor.RegisterHandler(string(domain.InboxGeneratedReportEvent), ReportGeneratedHandler)
 
 	OutboxWorker := worker.NewOutboxWorker(OutboxRepository, dispatcherChan)
-	inboxWorker := worker.NewInboxWorker(InboxRepository, Inboxprocessor)
+	inboxWorker := worker.NewInboxWorker(InboxRepository, Inboxprocessor, OutboxRepository)
 	go inboxWorker.Process(ctx)
 	go OutboxWorker.Process(ctx)
 

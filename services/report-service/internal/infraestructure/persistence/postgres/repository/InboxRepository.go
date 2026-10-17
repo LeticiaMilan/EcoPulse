@@ -90,6 +90,22 @@ func (repo *InboxRepositoryImpl) GetExecutor(ctx context.Context) *db.Queries {
 	return repo.Queries
 }
 
+func (repo *InboxRepositoryImpl) UpdateInboxRetry(ctx context.Context, inbox domain.Inbox) error {
+	Query := repo.GetExecutor(ctx)
+	_, err := Query.UpdateInboxRetry(ctx, db.UpdateInboxRetryParams{
+		NextAttempt: pgtype.Timestamptz{
+			Time:  inbox.Next_attempt,
+			Valid: true,
+		},
+		Retries: inbox.Retries,
+		ID:      inbox.ID,
+	})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (repo *InboxRepositoryImpl) BeginTransaction(ctx context.Context) (pgx.Tx, error) {
 	tx, err := repo.pool.Begin(ctx)
 	if err != nil {

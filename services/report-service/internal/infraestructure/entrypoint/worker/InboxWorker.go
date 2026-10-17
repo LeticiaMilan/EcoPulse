@@ -2,24 +2,36 @@ package worker
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log"
+	"math"
+	"report-service/internal/domain"
 	"report-service/internal/infraestructure/entrypoint/delivery"
 	"report-service/internal/ports"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 )
 
+type inboxDTO struct {
+	ID        uuid.UUID       `json:"id"`
+	EventType string          `json:"eventType"`
+	Content   json.RawMessage `json:"content"`
+	Erro      string          `json:"error"`
+}
 type InboxWorker struct {
-	Processor  *delivery.InboxProcessor
-	Repository ports.InboxRepository
+	Processor        *delivery.InboxProcessor
+	Repository       ports.InboxRepository
+	OutboxRepository ports.OutboxRepository
 }
 
-func NewInboxWorker(repository ports.InboxRepository, processor *delivery.InboxProcessor) *InboxWorker {
+func NewInboxWorker(repository ports.InboxRepository, processor *delivery.InboxProcessor, OutboxRepository ports.OutboxRepository) *InboxWorker {
 	return &InboxWorker{
-		Processor:  processor,
-		Repository: repository,
+		Processor:        processor,
+		Repository:       repository,
+		OutboxRepository: OutboxRepository,
 	}
 }
 
@@ -33,7 +45,7 @@ func (i *InboxWorker) Process(ctx context.Context) error {
 		case <-ticker.C:
 			log.Printf("Processing inbox")
 			if err := i.Run(ctx); err != nil {
-				return err
+				log.Printf("Error processing inbox: %v", err)
 			}
 		}
 	}
@@ -45,29 +57,62 @@ func (i *InboxWorker) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	var executando bool
+	var inbox *domain.Inbox
+	var Erro error = nil
 	defer func() {
-		if executando {
+		log.Printf("Finished processing inbox")
+		if domain.IsDomainValidationError(Erro) {
+			inboxDTO := inboxDTO{
+				ID:        inbox.ID,
+				EventType: string(inbox.EventType),
+				Content:   inbox.Content,
+				Erro:      Erro.Error(),
+			}
+			content, err := json.Marshal(inboxDTO)
+			if err == nil {
+				err = i.OutboxRepository.Save(ctx, domain.NewOutbox(domain.OutboxReportGeneratedError, content))
+				if err != nil {
+					log.Printf("Error while saving outbox: %v", err)
+				}
+				Erro = tx.Commit(ctx)
+				if Erro != nil {
+					log.Printf("[Worker] Commit err: %+v", err)
+				}
+				log.Println("Transaction commit")
+			}
+		} else {
 			if err := tx.Rollback(ctx); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
 				log.Print("Error while rolling back transaction")
 			} else {
-				log.Println("Transaction rollback")
+				if Erro != nil {
+					log.Println("Transaction rollback")
+					retry := inbox.Retries + 1
+					seconds := math.Pow(2, float64(retry)) * 2
+					inbox.Retries = retry
+					inbox.Next_attempt = time.Now().Add(time.Duration(seconds) * time.Second)
+					erro := i.Repository.UpdateInboxRetry(ctx, *inbox)
+					if erro != nil {
+						log.Printf("Error while updating inbox retry: %v", erro)
+					}
+				}
+
 			}
 		}
 	}()
 
 	txCtx := context.WithValue(ctx, "tx", tx)
-	inbox, _ := i.Repository.GetUnprocessedMessage(txCtx)
+	inbox, _ = i.Repository.GetUnprocessedMessage(txCtx)
 	if inbox == nil {
 	} else {
-		executando = true
-		if err := i.Processor.Process(txCtx, *inbox); err != nil {
-			log.Printf("[Worker] Process err: %+v", err)
-			return err
-		}
-		log.Println("Done processing inbox")
 
-		if err := tx.Commit(ctx); err != nil {
+		Erro = i.Processor.Process(txCtx, *inbox)
+		if Erro != nil {
+			log.Printf("[Worker] Process err: %+v", Erro)
+			return Erro
+		}
+
+		Erro = tx.Commit(ctx)
+		if Erro != nil {
 			log.Printf("[Worker] Commit err: %+v", err)
 		}
 		log.Println("Transaction commit")

@@ -13,6 +13,7 @@ type InboxRepository interface {
 	Save(ctx context.Context, inbox *domain.Inbox) error
 	GetUnprocessedMessage(ctx context.Context) (*domain.Inbox, error)
 	MarkAsProcessed(ctx *context.Context, id uuid.UUID) error
+	UpdateInboxRetry(ctx context.Context, inbox domain.Inbox) error
 	GetExecutor(ctx context.Context) *db.Queries
 	BeginTransaction(ctx context.Context) (pgx.Tx, error)
 }

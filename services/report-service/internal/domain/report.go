@@ -12,7 +12,19 @@ var (
 	ErrInvalidLocation    = errors.New("Localização inválida")
 	ErrInvalidReportType  = errors.New("Tipo de relato inválido")
 	ErrInvalidDatetime    = errors.New("Data inválida")
+	ErrInvalidUser        = errors.New("Usuário inválido/nulo")
 )
+
+func IsDomainValidationError(err error) bool {
+	if err == nil {
+		return false
+	}
+	return errors.Is(err, ErrInvalidCoordinates) ||
+		errors.Is(err, ErrInvalidLocation) ||
+		errors.Is(err, ErrInvalidReportType) ||
+		errors.Is(err, ErrInvalidDatetime) ||
+		errors.Is(err, ErrInvalidUser)
+}
 
 type ReportStatus string
 
@@ -51,13 +63,19 @@ func (r *Report) Validate() error {
 		return err
 	}
 
+	if err := r.isUserValid(); err != nil {
+		return err
+	}
 	// 4a validação: Área afetada >= 0
 
 	return nil
 }
 
-func (r *Report) Transite() {
-
+func (r *Report) isUserValid() error {
+	if r.UserID == uuid.Nil {
+		return ErrInvalidUser
+	}
+	return nil
 }
 
 func (r *Report) isReportTypeValid() error {

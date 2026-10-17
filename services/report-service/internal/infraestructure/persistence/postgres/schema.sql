@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS inbox(
     content      JSONB,
     retries      INT NOT NULL DEFAULT 0,
     received_at  timestamptz,
+    next_attempt timestamptz DEFAULT NOW(),
     processed_at timestamptz
 );
 

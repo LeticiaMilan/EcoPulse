@@ -12,17 +12,16 @@ import (
 type EventEnvelope struct {
 	ID          uuid.UUID       `json:"id"`
 	Source      string          `json:"source"`
-	Type        string          `json:"type"`
-	Time        time.Time       `json:"time"`
 	ContentType string          `json:"contentType"`
 	Data        json.RawMessage `json:"data"`
-	Tx          pgx.Tx
+	RoutingKey  string          `json:"-"`
+	Tx          pgx.Tx          `json:"-"`
 }
 
-func MapInboxEventToApplication(EventEnvelope *EventEnvelope) *domain.Inbox {
+func MapInboxEventToApplication(EventEnvelope EventEnvelope) *domain.Inbox {
 	inboxRetorno := &domain.Inbox{
 		ID:           EventEnvelope.ID,
-		EventType:    domain.InboxEventType(EventEnvelope.Type),
+		EventType:    domain.InboxEventType(EventEnvelope.RoutingKey),
 		Status:       domain.InboxStatusPending,
 		Content:      []byte(EventEnvelope.Data),
 		Retries:      0,
@@ -37,8 +36,7 @@ func mapOutboxEventToEnvelope(outbox *domain.Outbox) EventEnvelope {
 	eventEnvelope := EventEnvelope{
 		ID:          outbox.ID,
 		Source:      "SERVICE.REPORT",
-		Type:        string(outbox.EventType),
-		Time:        time.Now(),
+		RoutingKey:  string(outbox.EventType),
 		ContentType: "application/json",
 		Data:        outbox.Content,
 	}

@@ -72,15 +72,8 @@ func (uc *GeneratedReportUseCase) Execute(ctx context.Context, report *domain.Re
 		return err
 	}
 
-	outbox := domain.Outbox{
-		ID:           uuid.New(),
-		EventType:    domain.OutboxReportCreated,
-		Status:       domain.OutboxStatusPending,
-		Content:      content,
-		Retries:      0,
-		Created_at:   time.Now(),
-		Processed_at: time.Time{},
-	}
+	outbox := domain.NewOutbox(domain.OutboxReportCreated, content)
+
 	log.Printf("Before saving outbox %+v", outbox)
 	if err := uc.OutboxRepository.Save(ctx, outbox); err != nil {
 		return err
