@@ -8,7 +8,7 @@ from application.use_cases import HANDLERS
 from core.rules import AreaRules
 from infrastructure import database
 
-SOURCE = "calculate-area-service"
+SOURCE = "SERVICE.AFFECTED_AREA"
 OUTBOX_BATCH_SIZE = 50
 
 # Cria (se não existir) a exchange, a fila deste serviço e liga a fila nos eventos que ele trata
@@ -29,7 +29,8 @@ async def run_event_consumer(conn: AsyncConnection, queue: AbstractQueue) -> Non
             try:
                 body = json.loads(message.body)
                 event_id = str(body["id"])
-                event_type = body["type"]
+                # O envelope padrão não tem o tipo do evento, ele vem na routing key
+                event_type = message.routing_key
                 data = body["data"]
             except (ValueError, KeyError, TypeError):
                 print(f"Mensagem fora do formato, descartada: {message.body[:200]}")
@@ -96,15 +97,12 @@ async def run_outbox_dispatcher(
             await asyncio.sleep(poll_interval_s)
 
 
-# Envelope no formato CloudEvents
+# Envelope padrão do EcoPulse (rabbitmq_documentation.md)
 def _to_message(event: dict) -> aio_pika.Message:
     body = {
-        "specversion": "1.0",
         "id": str(event["id"]),
         "source": SOURCE,
-        "type": event["event_type"],
-        "time": event["created_at"].isoformat(),
-        "datacontenttype": "application/json",
+        "contentType": "application/json",
         "data": event["payload"],
     }
     return aio_pika.Message(

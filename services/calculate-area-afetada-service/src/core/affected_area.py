@@ -20,11 +20,11 @@ class AreaStatus(str, Enum):
 
 class AreaEventType(str, Enum):
     # Os valores servem como routing key no RabbitMQ
-    DETECTED = "affected-area.detected"
-    UPDATED = "affected-area.updated"
-    CONFIRMATION_REQUESTED = "affected-area.confirmation-requested"
-    RESOLVED = "affected-area.resolved"
-    EXPIRED = "affected-area.expired"
+    DETECTED = "EVENTS.AFFECTED_AREA.DETECTED"
+    UPDATED = "EVENTS.AFFECTED_AREA.UPDATED"
+    CONFIRMATION_REQUESTED = "EVENTS.AFFECTED_AREA.CONFIRMATION_REQUESTED"
+    RESOLVED = "EVENTS.AFFECTED_AREA.RESOLVED"
+    EXPIRED = "EVENTS.AFFECTED_AREA.EXPIRED"
 
 
 @dataclass(frozen=True)
