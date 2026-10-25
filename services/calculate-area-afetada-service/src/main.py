@@ -10,8 +10,8 @@ from infrastructure import database, messaging
 # Os valores padrão servem para rodar local com o docker-compose deste serviço
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://ecopulse:ecopulse@localhost:5432/calculate_area")
 RABBITMQ_URL = os.getenv("RABBITMQ_URL", "amqp://ecopulse:ecopulse@localhost:5672/")
-RABBITMQ_EXCHANGE = os.getenv("RABBITMQ_EXCHANGE", "ecopulse.events")
-RABBITMQ_QUEUE = os.getenv("RABBITMQ_QUEUE", "calculate-area-service")
+RABBITMQ_EXCHANGE = os.getenv("RABBITMQ_EXCHANGE", "exchange.ecopulse")
+RABBITMQ_QUEUE = os.getenv("RABBITMQ_QUEUE", "queue.service.affected-area")
 POLL_INTERVAL_S = float(os.getenv("POLL_INTERVAL_SECONDS", "1"))
 
 async def main() -> None:

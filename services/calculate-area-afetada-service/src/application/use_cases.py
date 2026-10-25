@@ -6,12 +6,12 @@ from core.affected_area import AffectedArea, ReportPoint, ReportType, assign_rep
 from core.rules import AreaRules
 from infrastructure import database
 
-# data esperado: {"report_id", "user_id", "type", "latitude", "longitude", "datetime"}
+# data esperado: {"id", "user_id", "type", "latitude", "longitude", "datetime"}
 async def handle_report_validated(
     conn: AsyncConnection, data: dict, rules: AreaRules, now: datetime
 ) -> None:
     report = ReportPoint(
-        report_id=UUID(data["report_id"]),
+        report_id=UUID(data["id"]),
         user_id=UUID(data["user_id"]),
         type=ReportType(data["type"]),
         latitude=float(data["latitude"]),
@@ -49,8 +49,8 @@ async def run_scheduler(conn: AsyncConnection, rules: AreaRules, interval_s: flo
 
 # Tipo do evento recebido -> caso de uso que trata ele
 HANDLERS = {
-    "report.validated": handle_report_validated,
-    "affected-area.vote": handle_vote,
+    "EVENTS.REPORT.VALIDATED": handle_report_validated,
+    "EVENTS.AFFECTED_AREA.VOTE": handle_vote,
 }
 
 # Salva a área e os eventos dela na mesma transação (padrão Outbox)
