@@ -12,30 +12,27 @@ import (
 	"github.com/google/uuid"
 )
 
-type ReportDTO struct {
-	ID        uuid.UUID `json:"id"`
-	Latitude  float64   `json:"latitude"`
-	Longitude float64   `json:"longitude"`
-	Type      string    `json:"type"`
-	Status    string    `json:"status"`
-	UserId    uuid.UUID `json:"user_id"`
-	Area      string    `json:"area"`
-	Datetime  time.Time `json:"datetime"`
-}
-
-type GeneratedReportUseCase struct {
+type ReportUseCase struct {
 	ReportRepository ports.ReportRepository
 	OutboxRepository ports.OutboxRepository
-	GeocodingAPI     ports.GeocodingAPI
 	clock            ports.BrasilClock
 }
 
-func NewProcessReportUseCase(reportRepository ports.ReportRepository, geocodingAPI ports.GeocodingAPI, clock ports.BrasilClock, OutboxRepository ports.OutboxRepository) *GeneratedReportUseCase {
-	return &GeneratedReportUseCase{
+func NewReportUseCase(reportRepository ports.ReportRepository, clock ports.BrasilClock, OutboxRepository ports.OutboxRepository) *ReportUseCase {
+	return &ReportUseCase{
 		ReportRepository: reportRepository,
-		GeocodingAPI:     geocodingAPI,
 		clock:            clock,
 		OutboxRepository: OutboxRepository,
+	}
+}
+
+type GeneratedReportUseCase struct {
+	ReportUseCase *ReportUseCase
+}
+
+func NewGeneratedReportUseCase(ReportUseCase *ReportUseCase) *GeneratedReportUseCase {
+	return &GeneratedReportUseCase{
+		ReportUseCase: ReportUseCase,
 	}
 }
 
@@ -44,58 +41,39 @@ func (uc *GeneratedReportUseCase) Execute(ctx context.Context, report *domain.Re
 		log.Printf("[ReportUseCase] Execute err: %+v", err)
 		return err
 	}
-	//if err := uc.IsCoordinatesValid(&ctx, report); err != nil {
-	//	return err
-	//}
-
-	//if err := uc.isDatetimeValid(report, uc.clock); err != nil {
-	//	return err
-	//}
-
-	if err := uc.ReportRepository.Create(ctx, report); err != nil {
+	if err := uc.IsCoordinatesValid(report); err != nil {
 		return err
 	}
-	log.Print("Salvou no banco de dados")
-	reportDTO := ReportDTO{
-		ID:        report.ID,
-		Latitude:  report.Latitude,
-		Longitude: report.Longitude,
-		Type:      string(report.Type),
-		Status:    string(report.Status),
-		UserId:    report.UserID,
-		Area:      "",
-		Datetime:  report.Datetime,
+
+	if err := uc.isDatetimeValid(report, uc.ReportUseCase.clock); err != nil {
+		return err
 	}
+
+	if err := uc.ReportUseCase.ReportRepository.Create(ctx, report); err != nil {
+		return err
+	}
+
+	reportDTO := MapReportToReportDTO(report)
 	content, err := json.Marshal(reportDTO)
 
 	if err != nil {
 		return err
 	}
 
-	outbox := domain.NewOutbox(domain.OutboxReportCreated, content)
+	outbox := domain.NewOutbox(domain.OutboxReportGenerated, content)
 
-	log.Printf("Before saving outbox %+v", outbox)
-	if err := uc.OutboxRepository.Save(ctx, outbox); err != nil {
+	if err := uc.ReportUseCase.OutboxRepository.Save(ctx, outbox); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (uc *GeneratedReportUseCase) IsCoordinatesValid(ctx *context.Context, r *domain.Report) error {
+func (uc *GeneratedReportUseCase) IsCoordinatesValid(r *domain.Report) error {
 	if r.Latitude <= -90 || r.Latitude >= 90 || r.Longitude <= -180 || r.Longitude >= 180 {
 		return domain.ErrInvalidCoordinates
 	}
-	inputParams := ports.GeocodingInputParams{
-		Latitude:  r.Latitude,
-		Longitude: r.Longitude,
-	}
-	if isBrasil, err := uc.GeocodingAPI.IsBrazil(*ctx, &inputParams); !isBrasil || err != nil {
-		if err != nil {
-			return err
-		}
-		return domain.ErrInvalidLocation
-	}
+
 	return nil
 }
 
@@ -109,8 +87,109 @@ func (uc *GeneratedReportUseCase) isDatetimeValid(report *domain.Report, clock p
 	return nil
 }
 
-type CancelReportUseCase struct{}
+type ValidatedReportUseCase struct {
+	ReportUseCase *ReportUseCase
+}
 
-func (uc *CancelReportUseCase) Execute() error {
+func NewValidatedReport(ReportUseCase *ReportUseCase) *ValidatedReportUseCase {
+	return &ValidatedReportUseCase{
+		ReportUseCase: ReportUseCase,
+	}
+}
+
+func (uc *ValidatedReportUseCase) Execute(ctx context.Context, report *domain.Report) error {
+
+	report, err := uc.ReportUseCase.ReportRepository.Validate(ctx, report)
+
+	if err != nil {
+		return err
+	}
+
+	reportDTO := MapReportToReportDTO(report)
+	content, err := json.Marshal(reportDTO)
+
+	outbox := domain.NewOutbox(domain.OutboxReportValidated, content)
+
+	if err := uc.ReportUseCase.OutboxRepository.Save(ctx, outbox); err != nil {
+		return err
+	}
 	return nil
+}
+
+type RejectedReportUseCase struct {
+	ReportUseCase *ReportUseCase
+}
+
+func NewRejectedReport(ReportUseCase *ReportUseCase) *RejectedReportUseCase {
+	return &RejectedReportUseCase{
+		ReportUseCase: ReportUseCase,
+	}
+}
+func (uc *RejectedReportUseCase) Execute(ctx context.Context, report *domain.Report) error {
+	report, err := uc.ReportUseCase.ReportRepository.Reject(ctx, report)
+
+	if err != nil {
+		return err
+	}
+
+	reportDTO := MapReportToReportDTO(report)
+	content, err := json.Marshal(reportDTO)
+
+	outbox := domain.NewOutbox(domain.OutboxReportRejected, content)
+
+	if err := uc.ReportUseCase.OutboxRepository.Save(ctx, outbox); err != nil {
+		return err
+	}
+	return nil
+}
+
+type AreaDefinedReportUseCase struct {
+	ReportUseCase *ReportUseCase
+}
+
+func NewAreaDefinedReport(ReportUseCase *ReportUseCase) *AreaDefinedReportUseCase {
+	return &AreaDefinedReportUseCase{
+		ReportUseCase: ReportUseCase,
+	}
+}
+func (uc *AreaDefinedReportUseCase) Execute(ctx context.Context, report *domain.Report) error {
+	report, err := uc.ReportUseCase.ReportRepository.DefineArea(ctx, report)
+
+	if err != nil {
+		return err
+	}
+
+	reportDTO := MapReportToReportDTO(report)
+	content, err := json.Marshal(reportDTO)
+
+	outbox := domain.NewOutbox(domain.OutboxReportCreated, content)
+
+	if err := uc.ReportUseCase.OutboxRepository.Save(ctx, outbox); err != nil {
+		return err
+	}
+	return nil
+}
+
+type ReportDTO struct {
+	ID        uuid.UUID `json:"id"`
+	Latitude  float64   `json:"latitude"`
+	Longitude float64   `json:"longitude"`
+	Type      string    `json:"type"`
+	Status    string    `json:"status"`
+	UserId    uuid.UUID `json:"user_id"`
+	Area      string    `json:"area"`
+	Datetime  time.Time `json:"datetime"`
+}
+
+func MapReportToReportDTO(report *domain.Report) ReportDTO {
+	return ReportDTO{
+		ID:        report.ID,
+		Latitude:  report.Latitude,
+		Longitude: report.Longitude,
+		Type:      string(report.Type),
+		Status:    string(report.Status),
+		UserId:    report.UserID,
+		Area:      "",
+		Datetime:  report.Datetime,
+	}
 }

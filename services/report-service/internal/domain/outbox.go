@@ -17,8 +17,14 @@ const (
 type OutboxEventType string
 
 const (
-	OutboxReportGeneratedError OutboxEventType = "EVENTS.REPORT.GENERATED_ERROR"
-	OutboxReportCreated        OutboxEventType = "EVENTS.REPORT.CREATED"
+	OutboxReportGenerated        OutboxEventType = "EVENTS.REPORT.GENERATED"
+	OutboxReportGeneratedError   OutboxEventType = "EVENTS.REPORT.GENERATED_ERROR"
+	OutboxReportValidated        OutboxEventType = "EVENTS.REPORT.VALIDATED"
+	OutboxReportValidatedError   OutboxEventType = "EVENTS.REPORT.VALIDATED_ERROR"
+	OutboxReportRejected         OutboxEventType = "EVENTS.REPORT.REJECTED"
+	OutboxReportRejectedError    OutboxEventType = "EVENTS.REPORT.REJECTED_ERROR"
+	OutboxReportCreated          OutboxEventType = "EVENTS.REPORT.CREATED"
+	OutboxReportDefinedAreaError OutboxEventType = "EVENTS.REPORT.DEFINED_AREA_ERROR"
 )
 
 type Outbox struct {

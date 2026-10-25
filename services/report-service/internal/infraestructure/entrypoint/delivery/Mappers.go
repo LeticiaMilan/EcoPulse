@@ -21,6 +21,18 @@ func MapInboxModelToApplication(inboxModel *db.Inbox) *domain.Inbox {
 	}
 }
 
+func MapReportModelToApplication(reportModel *db.Report) *domain.Report {
+	return &domain.Report{
+		ID:        reportModel.ID,
+		Latitude:  reportModel.Latitude.Float64,
+		Longitude: reportModel.Longitude.Float64,
+		Type:      domain.ReportType(reportModel.Type.String),
+		Status:    domain.ReportStatus(reportModel.Status.String),
+		UserID:    reportModel.ID,
+		Area:      domain.AffectedArea{},
+		Datetime:  reportModel.Datetime.Time,
+	}
+}
 func MapOutboxModelToApplication(outboxModel *db.Outbox) *domain.Outbox {
 	return &domain.Outbox{
 		ID:           outboxModel.ID,

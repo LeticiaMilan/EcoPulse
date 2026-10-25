@@ -60,7 +60,6 @@ func (i *InboxWorker) Run(ctx context.Context) error {
 	var inbox *domain.Inbox
 	var Erro error = nil
 	defer func() {
-		log.Printf("Finished processing inbox")
 		if domain.IsDomainValidationError(Erro) {
 			inboxDTO := inboxDTO{
 				ID:        inbox.ID,
@@ -70,16 +69,34 @@ func (i *InboxWorker) Run(ctx context.Context) error {
 			}
 			content, err := json.Marshal(inboxDTO)
 			if err == nil {
-				err = i.OutboxRepository.Save(ctx, domain.NewOutbox(domain.OutboxReportGeneratedError, content))
-				if err != nil {
-					log.Printf("Error while saving outbox: %v", err)
+				switch string(inbox.EventType) {
+				case string(domain.InboxGeneratedReportEvent):
+					err = i.OutboxRepository.Save(ctx, domain.NewOutbox(domain.OutboxReportGeneratedError, content))
+					if err != nil {
+						log.Printf("Error while saving outbox: %v", err)
+					}
+				case string(domain.InboxValidatedReportEvent):
+					err = i.OutboxRepository.Save(ctx, domain.NewOutbox(domain.OutboxReportValidatedError, content))
+					if err != nil {
+						log.Printf("Error while saving outbox: %v", err)
+					}
+				case string(domain.InboxRejectedReportEvent):
+					err = i.OutboxRepository.Save(ctx, domain.NewOutbox(domain.OutboxReportRejectedError, content))
+					if err != nil {
+						log.Printf("Error while saving outbox: %v", err)
+					}
+				case string(domain.InboxAreaDefinedReportEvent):
+					err = i.OutboxRepository.Save(ctx, domain.NewOutbox(domain.OutboxReportDefinedAreaError, content))
+					if err != nil {
+						log.Printf("Error while saving outbox: %v", err)
+					}
 				}
-				Erro = tx.Commit(ctx)
-				if Erro != nil {
-					log.Printf("[Worker] Commit err: %+v", err)
-				}
-				log.Println("Transaction commit")
 			}
+			Erro = tx.Commit(ctx)
+			if Erro != nil {
+				log.Printf("[Worker] Commit err: %+v", err)
+			}
+			log.Println("Transaction commit")
 		} else {
 			if err := tx.Rollback(ctx); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
 				log.Print("Error while rolling back transaction")

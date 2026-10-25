@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"report-service/internal/domain"
+	"report-service/internal/infraestructure/entrypoint/delivery"
 	"report-service/internal/infraestructure/persistence/postgres/db"
 	"time"
 
@@ -70,16 +71,48 @@ func NewReportRepository(pool *pgxpool.Pool) *ReportRepositoryImpl {
 func (r *ReportRepositoryImpl) Create(ctx context.Context, report *domain.Report) error {
 	ReportParams := newCreateReportParams(report)
 	Query := r.GetExecutor(ctx)
-	createReport, err := Query.CreateReport(ctx, ReportParams)
+	_, err := Query.CreateReport(ctx, ReportParams)
 	if err != nil {
 		return err
 	}
-	log.Printf("Create Report %+v", createReport)
+
 	return nil
 }
 
-func (r *ReportRepositoryImpl) Update(ctx context.Context, report *domain.Report) error {
-	return nil
+func (r *ReportRepositoryImpl) Validate(ctx context.Context, report *domain.Report) (*domain.Report, error) {
+	Query := r.GetExecutor(ctx)
+
+	reportOutput, err := Query.ValidateReport(ctx, report.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	return delivery.MapReportModelToApplication(&reportOutput), nil
+}
+
+func (r *ReportRepositoryImpl) Reject(ctx context.Context, report *domain.Report) (*domain.Report, error) {
+	Query := r.GetExecutor(ctx)
+
+	reportOutput, err := Query.RejectReport(ctx, report.ID)
+	if err != nil {
+		return nil, err
+	}
+	return delivery.MapReportModelToApplication(&reportOutput), nil
+}
+
+func (r *ReportRepositoryImpl) DefineArea(ctx context.Context, report *domain.Report) (*domain.Report, error) {
+	/*
+		Query := r.GetExecutor(ctx)
+
+		reportOutput, err := Query.DefineAreaReport(ctx, report.ID, report.Area)
+
+		if err != nil {
+				return nil, err
+			}
+			return delivery.MapReportModelToApplication(&reportOutput), nil
+	*/
+
+	return nil, nil
 }
 
 func (r *ReportRepositoryImpl) GetExecutor(ctx context.Context) *db.Queries {

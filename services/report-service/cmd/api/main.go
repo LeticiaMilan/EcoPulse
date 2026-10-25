@@ -3,8 +3,7 @@ package main
 import (
 	"context"
 	"log"
-	"net"
-	"net/http"
+
 	"os"
 	"os/signal"
 	"report-service/internal/application"
@@ -12,7 +11,6 @@ import (
 	"report-service/internal/infraestructure/entrypoint/delivery"
 	"report-service/internal/infraestructure/entrypoint/worker"
 	"report-service/internal/infraestructure/external/BrasilNtp"
-	"report-service/internal/infraestructure/external/LatLngWorkGeocoding"
 	"report-service/internal/infraestructure/messaging/amqp"
 	"report-service/internal/infraestructure/persistence/postgres/repository"
 	"report-service/internal/ports"
@@ -36,23 +34,27 @@ func main() {
 	// Escutar interrupções do S.O
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
 	dispatcherChan := make(chan worker.EventEnvelope, 100)
 	ConsumerChannel := StartRabbit(ctx, InboxRepository, OutboxRepository, dispatcherChan)
 	defer ConsumerChannel.Close()
 
-	var httpClient *http.Client
-	httpClient = ConfigHttpClient()
-	GeoCodingAPI := LatLngWorkGeocoding.NewLatLngWorkGeocodingApi(httpClient)
 	BrasilNtpClock, err := BrasilNtp.NewBrasilNtpClock()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	reportUseCase := application.NewProcessReportUseCase(ReportRepository, GeoCodingAPI, BrasilNtpClock, OutboxRepository)
-	ReportGeneratedHandler := delivery.NewReportGeneratedHandler(reportUseCase)
+	reportUseCase := application.NewReportUseCase(ReportRepository, BrasilNtpClock, OutboxRepository)
 
+	ReportGeneratedHandler := delivery.NewHandler(application.NewGeneratedReportUseCase(reportUseCase))
+	ReportValidatedHandler := delivery.NewHandler(application.NewValidatedReport(reportUseCase))
+	ReportRejectedHandler := delivery.NewHandler(application.NewRejectedReport(reportUseCase))
+	ReportDefinedAreaHandler := delivery.NewHandler(application.NewValidatedReport(reportUseCase))
 	Inboxprocessor := delivery.NewInboxProcessor()
 	Inboxprocessor.RegisterHandler(string(domain.InboxGeneratedReportEvent), ReportGeneratedHandler)
+	Inboxprocessor.RegisterHandler(string(domain.InboxValidatedReportEvent), ReportValidatedHandler)
+	Inboxprocessor.RegisterHandler(string(domain.InboxRejectedReportEvent), ReportRejectedHandler)
+	Inboxprocessor.RegisterHandler(string(domain.InboxAreaDefinedReportEvent), ReportDefinedAreaHandler)
 
 	OutboxWorker := worker.NewOutboxWorker(OutboxRepository, dispatcherChan)
 	inboxWorker := worker.NewInboxWorker(InboxRepository, Inboxprocessor, OutboxRepository)
@@ -85,21 +87,6 @@ func database() *pgxpool.Pool {
 	}
 
 	return pool
-}
-
-func ConfigHttpClient() *http.Client {
-	return &http.Client{
-		Timeout: 20 * time.Second,
-		Transport: &http.Transport{
-			MaxIdleConns:        100,              // Total de conexões inativas mantidas no pool
-			MaxIdleConnsPerHost: 3,                // Conexões inativas por host (padrão do Go é apenas 2)
-			IdleConnTimeout:     90 * time.Second, // Tempo que uma conexão pode ficar inativa antes de fechar
-			DialContext: (&net.Dialer{
-				Timeout:   5 * time.Second,  // Timeout para abrir a conexão TCP
-				KeepAlive: 30 * time.Second, // Frequência do Keep-Alive no nível do SO
-			}).DialContext,
-		},
-	}
 }
 
 func StartRabbit(ctx context.Context, inboxRepository ports.InboxRepository, outboxRepository ports.OutboxRepository, dispatcherChan chan worker.EventEnvelope) *amqp091.Channel {

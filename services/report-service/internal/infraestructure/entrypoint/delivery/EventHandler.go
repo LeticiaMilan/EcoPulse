@@ -6,13 +6,14 @@ import (
 	"fmt"
 	"log"
 	"report-service/internal/application"
+	"report-service/internal/domain"
 	"time"
 
 	"github.com/google/uuid"
 )
 
 type EventHandler interface {
-	Handle(ctx context.Context, payload []byte) error
+	Handle(ctx context.Context, payload []byte, EventType string) error
 }
 
 type ReportGeneratedEventDTO struct {
@@ -24,33 +25,73 @@ type ReportGeneratedEventDTO struct {
 	Datetime  time.Time `json:"datetime"`
 }
 
-type ReportGeneratedHandler struct {
-	ReportUseCase *application.GeneratedReportUseCase
+type ReportValidatedEventDTO struct{}
+
+type ReportReceivedEventDTO struct{}
+
+type ReportAreaDefinedEventDTO struct{}
+
+type ReportHandler struct {
+	ReportUseCase application.IReportUseCase
 }
 
-func NewReportGeneratedHandler(reportUseCase *application.GeneratedReportUseCase) *ReportGeneratedHandler {
-	return &ReportGeneratedHandler{ReportUseCase: reportUseCase}
+func NewHandler(reportUseCase application.IReportUseCase) *ReportHandler {
+	return &ReportHandler{ReportUseCase: reportUseCase}
 }
 
-func (h *ReportGeneratedHandler) Handle(ctx context.Context, payload []byte) error {
-	var ReportDTO ReportGeneratedEventDTO
+func (h *ReportHandler) Handle(ctx context.Context, payload []byte, EventType string) error {
+	switch EventType {
+	case string(domain.InboxGeneratedReportEvent):
+		var GeneratedReportDTO ReportGeneratedEventDTO
+		if err := json.Unmarshal(payload, &GeneratedReportDTO); err != nil {
+			return fmt.Errorf("cannot unmarshal payload: %w", err)
+		}
+		domainInbox := MapReportGeneratedDTOToApplication(&GeneratedReportDTO)
+		if err := h.ReportUseCase.Execute(ctx, domainInbox); err != nil {
+			log.Printf("[GeneratedEventHandler] Error while processing event: %w", err.Error())
+			return err
+		}
+	case string(domain.InboxValidatedReportEvent):
+		var ValidatedReportDTO ReportValidatedEventDTO
+		if err := json.Unmarshal(payload, &ValidatedReportDTO); err != nil {
+			return fmt.Errorf("cannot unmarshal payload: %w", err)
+		}
+		/*
 
-	if err := json.Unmarshal(payload, &ReportDTO); err != nil {
-		return fmt.Errorf("cannot unmarshal payload: %w", err)
-	}
-	log.Printf("Received event type %s on GeneratedHandler", ReportDTO)
+			if err := h.ReportUseCase.Execute(ctx, ...); err != nil{
+				log.Printf("[ValidatedEventHandler] Error while processing event: %w", err.Error())
+				return err
+			}
+		*/
+	case string(domain.InboxRejectedReportEvent):
+		var RejectedReportDTO ReportReceivedEventDTO
+		if err := json.Unmarshal(payload, &RejectedReportDTO); err != nil {
+			return fmt.Errorf("cannot unmarshal payload: %w", err)
+		}
+		/*
 
-	domainInbox := MapReportGeneratedDTOToApplication(&ReportDTO)
-	log.Printf("Parsed domainInbox: %s ", domainInbox)
+			if err := h.ReportUseCase.Execute(ctx, ...); err != nil{
+				log.Printf("[ValidatedEventHandler] Error while processing event: %w", err.Error())
+				return err
+			}
+		*/
 
-	if err := h.ReportUseCase.Execute(ctx, domainInbox); err != nil {
-		log.Printf("[EventHandler] Error while processing event: %w", err.Error())
-		return err
+	case string(domain.InboxAreaDefinedReportEvent):
+		var AreaDefinedReportDTO ReportAreaDefinedEventDTO
+		if err := json.Unmarshal(payload, &AreaDefinedReportDTO); err != nil {
+			return fmt.Errorf("cannot unmarshal payload: %w", err)
+		}
+
+		/*
+
+			if err := h.ReportUseCase.Execute(ctx, ...); err != nil{
+				log.Printf("[ValidatedEventHandler] Error while processing event: %w", err.Error())
+				return err
+			}
+		*/
+	default:
+		return fmt.Errorf("invalid event type: %s", EventType)
 	}
 
 	return nil
 }
-
-type ReportRejectedHandler struct{}
-type ReportValidatedHandler struct{}
-type ReportAreaDefinedHandler struct{}

@@ -31,7 +31,8 @@ type ReportStatus string
 const (
 	Created    ReportStatus = "created"    // Estado final (Já pode ser sincronizado)
 	InProgress ReportStatus = "inProgress" // Usuário criou, mas ainda não foi liberado
-	Validating ReportStatus = "validating" // Etapa de validação por outros usuários
+	Validated  ReportStatus = "validated"  // Etapa de validação por outros usuários
+	Rejected   ReportStatus = "rejected"
 )
 
 type ReportType string

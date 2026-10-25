@@ -27,5 +27,5 @@ func (p *InboxProcessor) Process(ctx context.Context, payload domain.Inbox) erro
 		return fmt.Errorf("event type %s does not exist", payload.EventType)
 	}
 
-	return handler.Handle(ctx, payload.Content)
+	return handler.Handle(ctx, payload.Content, string(payload.EventType))
 }
