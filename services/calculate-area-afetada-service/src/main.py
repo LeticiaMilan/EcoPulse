@@ -1,5 +1,55 @@
 # Link para acessar o site do rabbtmq: http://localhost:15672
 # Usuário e senha para acesso da página do rabbtmq: ecopulse
+
+'''Exemplos para a comunicação:
+
+Mensagem de entrada:
+{
+  "id": "3a8d1e05-6f2c-4b91-8840-d9e2358b1c47",
+  "source": "SERVICE.REPORT",
+  "contentType": "application/json",
+  "data": {
+    "id": "8f62b19e-5c40-42ae-bb73-936d5e1a7b80",
+    "user_id": "c19b43d7-e218-450f-a396-745812fe69b2",
+    "type": "Flooding",
+    "latitude": -21.1775,
+    "longitude": -47.8103,
+    "datetime": "2026-10-31T15:30:00Z"
+  }
+}
+
+Mensagem de Saída:
+{
+  "id": "2f76aaed-109a-4542-9734-2eb4a20c8cd3",
+  "source": "SERVICE.AFFECTED_AREA",
+  "contentType": "application/json",
+  "data": {
+    "area_id": "45f229ff-1127-4dbc-9b5b-318f8eccc9eb",
+    "type": "Flooding",
+    "status": "active",
+    "area_m2": 58598.47,
+    "center": {
+      "latitude": -21.177542928654507,
+      "longitude": -47.81039045186131
+    },
+    "polygon": {
+      "type": "Polygon",
+      "coordinates": [
+        [
+          [-47.80915977255845, -21.1775609594799],
+          [-47.809118275766075, -21.17763871413161],
+          [-47.80908501840699, -21.177719844912232],
+          [-47.80915977255845, -21.1775609594799]
+        ]
+      ]
+    },
+    "reports": 3,
+    "users": 3
+  }
+}
+
+'''
+
 import asyncio
 import os
 import aio_pika
