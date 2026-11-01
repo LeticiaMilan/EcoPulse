@@ -4,7 +4,7 @@
 
 ### PostgreSQL
 
-As tabelas de relatos, inbox e outbox foram criadas conforme o arquivo /src/db.sql
+As tabelas de relatos, inbox e outbox foram criadas conforme o arquivo /src/db.
 
 ### Docker
 
