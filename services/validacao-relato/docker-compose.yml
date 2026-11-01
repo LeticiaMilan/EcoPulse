@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    container_name: validacao_relato_app
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      - DB_URL=postgres://postgres:dbadmin@postgres:5432/aps_validacao?sslmode=disable
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+    depends_on:
+      - postgres
+      - rabbitmq
+    networks:
+      - app-network
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: postgres_db
+    restart: always
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=dbadmin
+      - POSTGRES_DB=aps_validacao
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./init-db:/docker-entrypoint-initdb.d
+    networks:
+      - app-network
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: rabbitmq_broker
+    restart: always
+    ports:
+      - "5672:5672"   # Porta do protocolo AMQP para a aplicação
+      - "15672:15672" # Painel administrativo web
+    environment:
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - app-network
+
+volumes:
+  pgdata:
+  rabbitmq_data:
+
+networks:
+  app-network:
+    driver: bridge

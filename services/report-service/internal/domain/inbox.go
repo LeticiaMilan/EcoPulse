@@ -1,7 +1,6 @@
 package domain
 
 import (
-	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -9,29 +8,28 @@ import (
 
 type InboxStatus string
 
-var (
-	ErrInboxProcessingFailed = errors.New("inbox processing failed")
-)
-
 const (
 	InboxStatusPending  InboxStatus = "PENDING"
 	InboxStatusRejected InboxStatus = "REJECTED"
 	InboxStatusAccepted InboxStatus = "PROCESSED"
 )
 
-type inboxPayload struct {
-}
+type InboxEventType string
 
-type inbox struct {
+const (
+	InboxGeneratedReportEvent   InboxEventType = "EVENTS.REPORT.GENERATED"
+	InboxRejectedReportEvent    InboxEventType = "EVENTS.REPORT.REJECTED"
+	InboxValidatedReportEvent   InboxEventType = "EVENTS.REPORT.VALIDATED"
+	InboxAreaDefinedReportEvent InboxEventType = "EVENTS.REPORT.AREADEFINED"
+)
+
+type Inbox struct {
 	ID           uuid.UUID
-	EventType    string
+	EventType    InboxEventType
 	Status       InboxStatus
-	content      inboxPayload
-	retries      int8
-	received_at  time.Time
-	processed_at time.Time
-}
-
-func (i *inbox) Process() {
-
+	Content      []byte
+	Retries      int32
+	Received_at  time.Time
+	Processed_at time.Time
+	Next_attempt time.Time
 }
