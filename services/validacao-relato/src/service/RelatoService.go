@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"validacao-relato/src/model"
 	"validacao-relato/src/repository"
 )
@@ -40,7 +41,7 @@ func (s *RelatoService) CriarRelato(ctx context.Context, ID, usuarioID, tipo, de
 		Estado:    model.PossivelRelato,
 	}
 
-	err = s.repo.CriarComOutbox(ctx, tx, relato, "validacaonotificacao.criado", RelatoEvent{
+	err = s.repo.CriarComOutbox(ctx, tx, relato, "validacaoresposta.criado", RelatoEvent{
 		ID:        relato.ID,
 		UsuarioID: usuarioID,
 		Tipo:      tipo,
@@ -79,7 +80,7 @@ func (s *RelatoService) VotarRelato(ctx context.Context, relatoID string, positi
 		Positivo: positivo,
 	}
 
-	err = s.repo.AdicionarVoto(ctx, tx, relatoID, positivo, "validacaonotificacao.votado", eventPayload)
+	err = s.repo.AdicionarVoto(ctx, tx, relatoID, positivo, "validacaoresposta.votado", eventPayload)
 	if err != nil {
 		return err
 	}
@@ -88,7 +89,16 @@ func (s *RelatoService) VotarRelato(ctx context.Context, relatoID string, positi
 }
 
 func (s *RelatoService) BuscarPorID(ctx context.Context, id string) (*model.Relato, error) {
-	return s.repo.BuscarPorID(ctx, id)
+	relato, err := s.repo.BuscarPorIDComOutbox(ctx, id, "validacaoresposta.relato")
+	if err != nil {
+		return nil, fmt.Errorf("erro no service ao buscar relato por ID com outbox: %w", err)
+	}
+
+	if relato == nil {
+		return nil, nil // Relato não encontrado
+	}
+
+	return relato, nil
 }
 
 func (s *RelatoService) ListarRelatos(ctx context.Context, limit, offset int) ([]model.Relato, error) {
@@ -98,7 +108,7 @@ func (s *RelatoService) ListarRelatos(ctx context.Context, limit, offset int) ([
 	return s.repo.Listar(ctx, limit, offset)
 }
 
-func (s *RelatoService) AtualizarRelato(ctx context.Context, id, tipo, descricao string, lat, lon float64) (*model.Relato, error) {
+func (s *RelatoService) AtualizarRelato(ctx context.Context, id, tipo, descricao string, lat, lon float64, estado model.EstadoRelato) (*model.Relato, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
@@ -114,8 +124,9 @@ func (s *RelatoService) AtualizarRelato(ctx context.Context, id, tipo, descricao
 	relato.Descricao = descricao
 	relato.Latitude = lat
 	relato.Longitude = lon
+	relato.Estado = estado
 
-	err = s.repo.AtualizarComOutbox(ctx, tx, relato, "validacaonotificacao.atualizado", RelatoEvent{
+	err = s.repo.AtualizarComOutbox(ctx, tx, relato, "validacaoresposta.atualizado", RelatoEvent{
 		ID:        relato.ID,
 		UsuarioID: relato.UsuarioID,
 		Tipo:      relato.Tipo,
@@ -143,7 +154,7 @@ func (s *RelatoService) DeletarRelato(ctx context.Context, id string) error {
 		return errors.New("relato não encontrado")
 	}
 
-	err = s.repo.DeletarComOutbox(ctx, tx, id, "validacaonotificacao.deletado", RelatoEvent{
+	err = s.repo.DeletarComOutbox(ctx, tx, id, "validacaoresposta.deletado", RelatoEvent{
 		ID:        relato.ID,
 		UsuarioID: relato.UsuarioID,
 		Tipo:      relato.Tipo,

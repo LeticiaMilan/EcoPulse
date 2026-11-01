@@ -19,6 +19,7 @@ type RelatoRepository interface {
 	ProcessarInbox(ctx context.Context, msgID, eventType string, payload []byte, handler func() error) error
 	AdicionarVoto(ctx context.Context, tx *sql.Tx, relatoID string, positivo bool, eventType string, eventPayload interface{}) error
 	ProcessarAvaliacoesPeriodicas(ctx context.Context) error
+	BuscarPorIDComOutbox(ctx context.Context, id string, eventType string) (*model.Relato, error)
 }
 
 type PostgresRelatoRepository struct {
@@ -102,6 +103,33 @@ func (r *PostgresRelatoRepository) BuscarPorID(ctx context.Context, id string) (
 	}
 
 	return &relato, nil
+}
+
+func (r *PostgresRelatoRepository) BuscarPorIDComOutbox(ctx context.Context, id string, eventType string) (*model.Relato, error) {
+	relato, err := r.BuscarPorID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if relato == nil {
+		return nil, nil // Não encontrado
+	}
+
+	payload, err := json.Marshal(relato)
+	if err != nil {
+		return nil, fmt.Errorf("erro ao serializar relato para o outbox: %w", err)
+	}
+
+	outboxID := uuid.New().String()
+	queryOutbox := `
+		INSERT INTO outbox (id, event_type, status, content, created_at, next_attempt)
+		VALUES ($1, $2, 'PENDING', $3, NOW(), NOW())`
+
+	_, err = r.db.ExecContext(ctx, queryOutbox, outboxID, eventType, payload)
+	if err != nil {
+		return nil, fmt.Errorf("erro ao inserir evento no outbox: %w", err)
+	}
+
+	return relato, nil
 }
 
 func (r *PostgresRelatoRepository) AdicionarVoto(ctx context.Context, tx *sql.Tx, relatoID string, positivo bool, eventType string, eventPayload interface{}) error {

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"uuid"
+	"validacao-relato/src/model"
 	"validacao-relato/src/repository"
 	"validacao-relato/src/service"
 
@@ -97,17 +98,18 @@ func (c *InboxConsumer) StartConsuming(ctx context.Context) error {
 
 				case "validacaorelato.atualizar":
 					var req struct {
-						ID        string  `json:"id"`
-						Tipo      string  `json:"tipo"`
-						Descricao string  `json:"descricao"`
-						Latitude  float64 `json:"latitude"`
-						Longitude float64 `json:"longitude"`
+						ID        string             `json:"id"`
+						Tipo      string             `json:"tipo"`
+						Descricao string             `json:"descricao"`
+						Latitude  float64            `json:"latitude"`
+						Longitude float64            `json:"longitude"`
+						Estado    model.EstadoRelato `json:"estado"`
 					}
 					if err := json.Unmarshal(payload, &req); err != nil {
 						return fmt.Errorf("erro ao decodificar JSON de atualização: %w", err)
 					}
 
-					_, err := c.svc.AtualizarRelato(ctx, req.ID, req.Tipo, req.Descricao, req.Latitude, req.Longitude)
+					_, err := c.svc.AtualizarRelato(ctx, req.ID, req.Tipo, req.Descricao, req.Latitude, req.Longitude, req.Estado)
 					if err != nil {
 						return err
 					}
@@ -121,6 +123,19 @@ func (c *InboxConsumer) StartConsuming(ctx context.Context) error {
 					}
 
 					err := c.svc.DeletarRelato(ctx, req.ID)
+					if err != nil {
+						return err
+					}
+
+				case "validacaorelato.buscar":
+					var req struct {
+						ID string `json:"id"`
+					}
+					if err := json.Unmarshal(payload, &req); err != nil {
+						return fmt.Errorf("erro ao decodificar JSON de busca: %w", err)
+					}
+
+					_, err := c.svc.BuscarPorID(ctx, req.ID)
 					if err != nil {
 						return err
 					}

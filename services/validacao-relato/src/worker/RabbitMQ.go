@@ -50,14 +50,14 @@ func NewRabbitMQConn(url string) (*RabbitMQConn, error) {
 		return nil, err
 	}
 
-	filaNotificacao := "validacao_notificacoes_queue"
-	_, err = ch.QueueDeclare(filaNotificacao, true, false, false, false, nil)
+	filaResposta := "validacao_resposta_queue"
+	_, err = ch.QueueDeclare(filaResposta, true, false, false, false, nil)
 	if err != nil {
 		return nil, fmt.Errorf("falha ao declarar nova fila: %w", err)
 	}
 	err = ch.QueueBind(
-		filaNotificacao,
-		"validacaonotificacao.*", // Padrão que vai cair nesta nova fila
+		filaResposta,
+		"validacaoresposta.*", // Padrão que vai cair nesta nova fila
 		"validacao_relatos_exchange",
 		false,
 		nil,
