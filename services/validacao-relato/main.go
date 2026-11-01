@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"os"
 	"validacao-relato/src/database"
 	"validacao-relato/src/repository"
 	"validacao-relato/src/service"
@@ -15,7 +16,7 @@ func main() {
 	ctx := context.Background()
 
 	// Conexão com o PostgreSQL usando a nova função centralizada
-	dsn := "postgres://postgres:dbadmin@localhost:5432/aps_validacao?sslmode=disable"
+	dsn := os.Getenv("DB_URL")
 	db, err := database.NewPostgresConnection(dsn)
 	if err != nil {
 		log.Fatalf("Falha crítica ao iniciar banco de dados: %v", err)
@@ -23,7 +24,7 @@ func main() {
 	defer db.Close()
 
 	// Conexão e Configuração do RabbitMQ
-	rabbitConn, err := queue.NewRabbitMQConn("amqp://guest:guest@localhost:5672/")
+	rabbitConn, err := queue.NewRabbitMQConn(os.Getenv("RABBITMQ_URL"))
 	if err != nil {
 		log.Fatalf("Erro ao conectar no RabbitMQ: %v", err)
 	}

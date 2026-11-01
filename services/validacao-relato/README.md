@@ -4,7 +4,7 @@
 
 ### PostgreSQL
 
-As tabelas de relatos, inbox e outbox foram criadas conforme o arquivo /src/db.
+As tabelas de relatos, inbox e outbox foram criadas conforme o arquivo /init-db/db.sql
 
 A tabela relato no banco de dados local apresenta a seguinte estrutura:
 
