@@ -1,11 +1,13 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
 
 	"github.com/LeticiaMilan/ecopulse-login-mod/config"
+	"github.com/LeticiaMilan/ecopulse-login-mod/events"
 	"github.com/LeticiaMilan/ecopulse-login-mod/handlers"
 	"github.com/LeticiaMilan/ecopulse-login-mod/middleware"
 	"github.com/LeticiaMilan/ecopulse-login-mod/models"
@@ -14,20 +16,37 @@ import (
 
 func main() {
 	dbConnection := config.SetupDB()
-
-	_, err := dbConnection.Exec(models.CreateTableSQL)
-	if err != nil {
-		log.Fatalf("Erro ao criar a tabela de usuários: %v", err)
-	}
-
 	defer dbConnection.Close()
 
-	// Obtém o segredo JWT das variáveis de ambiente
+	// Cria a tabela de usuários
+	_, err := dbConnection.Exec(models.CreateTableSQL)
+	if err != nil {
+		log.Fatalf("Erro ao criar tabela de usuários: %v", err)
+	}
+
+	// Cria a tabela de eventos pendentes
+	_, err = dbConnection.Exec(events.CreateOutboxTableSQL)
+	if err != nil {
+		log.Fatalf("Erro ao criar tabela Outbox: %v", err)
+	}
+
+	// Configura o JWT
 	jwtSecret := os.Getenv("JWT_SECRET")
 
 	if len(jwtSecret) < 32 {
 		log.Fatal("JWT_SECRET deve possuir pelo menos 32 caracteres")
 	}
+
+	// Configura o RabbitMQ
+	rabbitURL := os.Getenv("RABBITMQ_URL")
+
+	if rabbitURL == "" {
+		log.Fatal("RABBITMQ_URL não foi configurada")
+	}
+
+	// Inicia o publicador de eventos em segundo plano
+	publisher := events.NewPublisher(dbConnection, rabbitURL)
+	go publisher.Run(context.Background())
 
 	router := mux.NewRouter()
 
@@ -44,7 +63,6 @@ func main() {
 	// Rotas de autenticação
 	router.HandleFunc("/auth/login", authHandler.Login).Methods("POST")
 
-	// Rota protegida por JWT
 	router.Handle(
 		"/auth/me",
 		middleware.AuthMiddleware([]byte(jwtSecret))(
