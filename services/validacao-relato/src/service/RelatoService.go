@@ -19,9 +19,13 @@ func NewRelatoService(db *sql.DB, repo repository.RelatoRepository) *RelatoServi
 }
 
 type RelatoEvent struct {
-	ID        string `json:"id"`
-	UsuarioID string `json:"usuario_id"`
-	Tipo      string `json:"tipo"`
+	ID        string             `json:"id"`
+	UsuarioID string             `json:"usuario_id"`
+	Tipo      string             `json:"tipo"`
+	Descricao string             `json:"descricao,omitempty"`
+	Latitude  float64            `json:"latitude,omitempty"`
+	Longitude float64            `json:"longitude,omitempty"`
+	Estado    model.EstadoRelato `json:"estado,omitempty"`
 }
 
 func (s *RelatoService) CriarRelato(ctx context.Context, ID, usuarioID, tipo, descricao string, lat, lon float64) (*model.Relato, error) {
@@ -41,10 +45,14 @@ func (s *RelatoService) CriarRelato(ctx context.Context, ID, usuarioID, tipo, de
 		Estado:    model.PossivelRelato,
 	}
 
-	err = s.repo.CriarComOutbox(ctx, tx, relato, "validacaoresposta.criado", RelatoEvent{
+	err = s.repo.CriarComOutbox(ctx, tx, relato, "EVENTS.VALIDATIONRESPONSE.CREATED", RelatoEvent{
 		ID:        relato.ID,
 		UsuarioID: usuarioID,
 		Tipo:      tipo,
+		Descricao: descricao,
+		Latitude:  lat,
+		Longitude: lon,
+		Estado:    relato.Estado,
 	})
 	if err != nil {
 		return nil, err
@@ -80,7 +88,7 @@ func (s *RelatoService) VotarRelato(ctx context.Context, relatoID string, positi
 		Positivo: positivo,
 	}
 
-	err = s.repo.AdicionarVoto(ctx, tx, relatoID, positivo, "validacaoresposta.votado", eventPayload)
+	err = s.repo.AdicionarVoto(ctx, tx, relatoID, positivo, "EVENTS.VALIDATIONRESPONSE.VOTED", eventPayload)
 	if err != nil {
 		return err
 	}
@@ -89,7 +97,7 @@ func (s *RelatoService) VotarRelato(ctx context.Context, relatoID string, positi
 }
 
 func (s *RelatoService) BuscarPorID(ctx context.Context, id string) (*model.Relato, error) {
-	relato, err := s.repo.BuscarPorIDComOutbox(ctx, id, "validacaoresposta.relato")
+	relato, err := s.repo.BuscarPorIDComOutbox(ctx, id, "EVENTS.VALIDATIONRESPONSE.REPORT")
 	if err != nil {
 		return nil, fmt.Errorf("erro no service ao buscar relato por ID com outbox: %w", err)
 	}
@@ -126,10 +134,14 @@ func (s *RelatoService) AtualizarRelato(ctx context.Context, id, tipo, descricao
 	relato.Longitude = lon
 	relato.Estado = estado
 
-	err = s.repo.AtualizarComOutbox(ctx, tx, relato, "validacaoresposta.atualizado", RelatoEvent{
+	err = s.repo.AtualizarComOutbox(ctx, tx, relato, "EVENTS.VALIDATIONRESPONSE.UPDATED", RelatoEvent{
 		ID:        relato.ID,
 		UsuarioID: relato.UsuarioID,
 		Tipo:      relato.Tipo,
+		Descricao: relato.Descricao,
+		Latitude:  relato.Latitude,
+		Longitude: relato.Longitude,
+		Estado:    relato.Estado,
 	})
 	if err != nil {
 		return nil, err
@@ -154,10 +166,14 @@ func (s *RelatoService) DeletarRelato(ctx context.Context, id string) error {
 		return errors.New("relato não encontrado")
 	}
 
-	err = s.repo.DeletarComOutbox(ctx, tx, id, "validacaoresposta.deletado", RelatoEvent{
+	err = s.repo.DeletarComOutbox(ctx, tx, id, "EVENTS.VALIDATIONRESPONSE.DELETED", RelatoEvent{
 		ID:        relato.ID,
 		UsuarioID: relato.UsuarioID,
 		Tipo:      relato.Tipo,
+		Descricao: relato.Descricao,
+		Latitude:  relato.Latitude,
+		Longitude: relato.Longitude,
+		Estado:    relato.Estado,
 	})
 	if err != nil {
 		return err

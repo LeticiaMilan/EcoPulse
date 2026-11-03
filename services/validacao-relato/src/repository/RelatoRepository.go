@@ -30,6 +30,38 @@ func NewPostgresRelatoRepository(db *sql.DB) *PostgresRelatoRepository {
 	return &PostgresRelatoRepository{db: db}
 }
 
+type EventEnvelope struct {
+	ID          string          `json:"id"`          // UUID v4 único da mensagem
+	Source      string          `json:"source"`      // Identificador do serviço emissor
+	ContentType string          `json:"contentType"` // MIME type (ex: application/json)
+	Data        json.RawMessage `json:"data"`        // Payload contextual do evento
+}
+
+// CriarEnvelopeEvent helper que padroniza a criação do EventEnvelope para o Outbox
+func CriarEnvelopeEvent(eventType string, eventPayload interface{}) ([]byte, string, error) {
+	// Serializa o payload específico de negócio para json.RawMessage
+	rawPayload, err := json.Marshal(eventPayload)
+	if err != nil {
+		return nil, "", fmt.Errorf("erro ao serializar payload para raw message: %w", err)
+	}
+
+	eventID := uuid.New().String()
+
+	envelope := EventEnvelope{
+		ID:          eventID,
+		Source:      "SERVICE.REPORTVALIDATION",
+		ContentType: "application/json",
+		Data:        rawPayload,
+	}
+
+	envelopeBytes, err := json.Marshal(envelope)
+	if err != nil {
+		return nil, "", fmt.Errorf("erro ao serializar EventEnvelope completo: %w", err)
+	}
+
+	return envelopeBytes, eventID, nil
+}
+
 func (r *PostgresRelatoRepository) CriarComOutbox(ctx context.Context, tx *sql.Tx, relato *model.Relato, eventType string, eventPayload interface{}) error {
 	queryRelato := `
 		INSERT INTO relatos (id, usuario_id, tipo, descricao, latitude, longitude, estado)
@@ -55,17 +87,16 @@ func (r *PostgresRelatoRepository) CriarComOutbox(ctx context.Context, tx *sql.T
 		return fmt.Errorf("erro ao inserir relato: %w", err)
 	}
 
-	payloadBytes, err := json.Marshal(eventPayload)
+	payloadBytes, eventID, err := CriarEnvelopeEvent(eventType, eventPayload)
 	if err != nil {
-		return fmt.Errorf("erro ao serializar payload do evento: %w", err)
+		return fmt.Errorf("erro ao criar envelope do evento: %w", err)
 	}
 
-	outboxID := uuid.New().String()
 	queryOutbox := `
 		INSERT INTO outbox (id, event_type, status, content, created_at, next_attempt)
 		VALUES ($1, $2, 'PENDING', $3, NOW(), NOW())`
 
-	_, err = tx.ExecContext(ctx, queryOutbox, outboxID, eventType, payloadBytes)
+	_, err = tx.ExecContext(ctx, queryOutbox, eventID, eventType, payloadBytes)
 	if err != nil {
 		return fmt.Errorf("erro ao inserir na outbox: %w", err)
 	}
@@ -114,17 +145,16 @@ func (r *PostgresRelatoRepository) BuscarPorIDComOutbox(ctx context.Context, id 
 		return nil, nil // Não encontrado
 	}
 
-	payload, err := json.Marshal(relato)
+	payload, eventID, err := CriarEnvelopeEvent(eventType, relato)
 	if err != nil {
-		return nil, fmt.Errorf("erro ao serializar relato para o outbox: %w", err)
+		return nil, fmt.Errorf("erro ao criar envelope do evento: %w", err)
 	}
 
-	outboxID := uuid.New().String()
 	queryOutbox := `
 		INSERT INTO outbox (id, event_type, status, content, created_at, next_attempt)
 		VALUES ($1, $2, 'PENDING', $3, NOW(), NOW())`
 
-	_, err = r.db.ExecContext(ctx, queryOutbox, outboxID, eventType, payload)
+	_, err = r.db.ExecContext(ctx, queryOutbox, eventID, eventType, payload)
 	if err != nil {
 		return nil, fmt.Errorf("erro ao inserir evento no outbox: %w", err)
 	}
@@ -151,17 +181,16 @@ func (r *PostgresRelatoRepository) AdicionarVoto(ctx context.Context, tx *sql.Tx
 	}
 
 	// Registra o evento na outbox na mesma transação
-	payloadBytes, err := json.Marshal(eventPayload)
+	payloadBytes, eventID, err := CriarEnvelopeEvent(eventType, eventPayload)
 	if err != nil {
-		return fmt.Errorf("erro ao serializar payload do evento de voto: %w", err)
+		return fmt.Errorf("erro ao criar envelope do evento de voto: %w", err)
 	}
 
-	outboxID := uuid.New().String()
 	queryOutbox := `
 		INSERT INTO outbox (id, event_type, status, content, created_at, next_attempt)
 		VALUES ($1, $2, 'PENDING', $3, NOW(), NOW())`
 
-	_, err = tx.ExecContext(ctx, queryOutbox, outboxID, eventType, payloadBytes)
+	_, err = tx.ExecContext(ctx, queryOutbox, eventID, eventType, payloadBytes)
 	if err != nil {
 		return fmt.Errorf("erro ao inserir evento de voto na outbox: %w", err)
 	}
@@ -224,17 +253,16 @@ func (r *PostgresRelatoRepository) AtualizarComOutbox(ctx context.Context, tx *s
 		return fmt.Errorf("erro ao atualizar relato: %w", err)
 	}
 
-	payloadBytes, err := json.Marshal(eventPayload)
+	payloadBytes, eventID, err := CriarEnvelopeEvent(eventType, eventPayload)
 	if err != nil {
-		return fmt.Errorf("erro ao serializar payload do evento: %w", err)
+		return fmt.Errorf("erro ao criar envelope do evento: %w", err)
 	}
 
-	outboxID := uuid.New().String()
 	queryOutbox := `
 		INSERT INTO outbox (id, event_type, status, content, created_at, next_attempt)
 		VALUES ($1, $2, 'PENDING', $3, NOW(), NOW())`
 
-	_, err = tx.ExecContext(ctx, queryOutbox, outboxID, eventType, payloadBytes)
+	_, err = tx.ExecContext(ctx, queryOutbox, eventID, eventType, payloadBytes)
 	if err != nil {
 		return fmt.Errorf("erro ao inserir na outbox: %w", err)
 	}
@@ -254,17 +282,16 @@ func (r *PostgresRelatoRepository) DeletarComOutbox(ctx context.Context, tx *sql
 		return fmt.Errorf("relato não encontrado para exclusão")
 	}
 
-	payloadBytes, err := json.Marshal(eventPayload)
+	payloadBytes, eventID, err := CriarEnvelopeEvent(eventType, eventPayload)
 	if err != nil {
-		return fmt.Errorf("erro ao serializar payload do evento: %w", err)
+		return fmt.Errorf("erro ao criar envelope do evento: %w", err)
 	}
 
-	outboxID := uuid.New().String()
 	queryOutbox := `
 		INSERT INTO outbox (id, event_type, status, content, created_at, next_attempt)
 		VALUES ($1, $2, 'PENDING', $3, NOW(), NOW())`
 
-	_, err = tx.ExecContext(ctx, queryOutbox, outboxID, eventType, payloadBytes)
+	_, err = tx.ExecContext(ctx, queryOutbox, eventID, eventType, payloadBytes)
 	if err != nil {
 		return fmt.Errorf("erro ao inserir na outbox: %w", err)
 	}
@@ -286,7 +313,7 @@ func (r *PostgresRelatoRepository) ProcessarInbox(ctx context.Context, msgID, ev
 
 	if err == sql.ErrNoRows {
 		// Mensagem nova, insere como PROCESSING
-		insertQuery := `INSERT INTO inbox (id, event_type, status, content, received_at, next_attempt) VALUES ($1, $2, 'PROCESSING', $3, NOW(), NOW())`
+		insertQuery := `INSERT INTO inbox (id, event_type, status, content, received_at, next_attempt) VALUES ($1, $2, 'PROCESSING', $3::jsonb, NOW(), NOW())`
 		_, err = tx.ExecContext(ctx, insertQuery, msgID, eventType, payload)
 		if err != nil {
 			return err

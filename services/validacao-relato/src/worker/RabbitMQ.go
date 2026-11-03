@@ -45,7 +45,8 @@ func NewRabbitMQConn(url string) (*RabbitMQConn, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = ch.QueueBind(filaValidacao, "validacaorelato.*", "exchange.ecopulse", false, nil)
+	err = ch.QueueBind(filaValidacao, "EVENTS.VALIDATION.*", "exchange.ecopulse", false, nil)
+	err = ch.QueueBind(filaValidacao, "EVENTS.REPORT.CREATED", "exchange.ecopulse", false, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +58,7 @@ func NewRabbitMQConn(url string) (*RabbitMQConn, error) {
 	}
 	err = ch.QueueBind(
 		filaResposta,
-		"validacaoresposta.*", // Padrão que vai cair nesta nova fila
+		"EVENTS.VALIDATIONRESPONSE.*", // Padrão que vai cair nesta nova fila
 		"exchange.ecopulse",
 		false,
 		nil,

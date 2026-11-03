@@ -172,7 +172,7 @@ Quando um relato é criado ele apresenta datas de criação, de próxima avalia�
 
 Consumido para criar uma cópia do relato original, com seu id e outras informações, para registrar os votos.
 
-* **Routing Key:** `validacaorelato.criar`
+* **Routing Key:** `EVENTS.VALIDATION.CREATE`
 
 #### Estrutura do Payload
 
@@ -190,12 +190,17 @@ Consumido para criar uma cópia do relato original, com seu id e outras informa�
 
 ```
 {
-    "id": "661211f1-921e-4100-9280-de1578f4dc0f",
-    "usuario_id": "d3b07384-d113-4ec2-a499-e82fa7ceef88",
-    "tipo": "Flooding",
-    "descricao": "Rua do centro está alagada devido a chuva",
-    "latitude": -20.8956,
-    "longitude": -48.2867
+  "id": "3a8d1e05-6f2c-4b91-8840-d9e2358b1c47",
+  "source": "SERVICE.FRONTEND",
+  "contentType": "application/json",
+  "data": {
+      "id": "661211f1-921e-4100-9280-de1578f4dc0f",
+      "usuario_id": "d3b07384-d113-4ec2-a499-e82fa7ceef88",
+      "tipo": "Flooding",
+      "descricao": "Rua do centro está alagada devido a chuva",
+      "latitude": -20.8956,
+      "longitude": -48.2867
+  }
 }
 ```
 
@@ -203,13 +208,13 @@ Consumido para criar uma cópia do relato original, com seu id e outras informa�
 
 Recebido como resposta para confirmar que a cópia do relato foi criada
 
-* **Routing Key:** `validacaoresposta.criado`
+* **Routing Key:** `EVENTS.VALIDATIONRESPONSE.CREATED`
 
 ### 3.3 Evento de Entrada: Votar no Relato para Validação
 
 Consumido para realizar a votação para confirmar o relato. Este evento ira receber votos positivos e votos negativos. O primeiro são votos de confirmação do relato e, o segundo de rejeição.
 
-* **Routing Key:** `validacaorelato.votar`
+* **Routing Key:** `EVENTS.VALIDATION.VOTE`
 
 #### Estrutura do Payload
 
@@ -222,8 +227,13 @@ Consumido para realizar a votação para confirmar o relato. Este evento ira rec
 
 ```
 {
+  "id": "3a8d1e05-6f2c-4b91-8840-d9e2358b1c47",
+  "source": "SERVICE.FRONTEND",
+  "contentType": "application/json",
+  "data": {
     "id": "661211f1-921e-4100-9280-de1578f4dc0f",
     "tipo": "positivo"
+  }
 }
 ```
 
@@ -231,13 +241,13 @@ Consumido para realizar a votação para confirmar o relato. Este evento ira rec
 
 Resposta gerada pelo evento de votação para confirmar que o voto foi realizado
 
-* **Routing Key:** `validacaoresposta.votado`
+* **Routing Key:** `EVENTS.VALIDATIONRESPONSE.VOTED`
 
 ### 3.5 Evento de Entrada: Busca de relato por id
 
 Consumido para buscar relato e confirmar seu estado.
 
-* **Routing Key:** `validacaorelato.buscar`
+* **Routing Key:** `EVENTS.VALIDATION.SEARCH`
 
 #### Estrutura do Payload (`data`)
 
@@ -247,7 +257,12 @@ Consumido para buscar relato e confirmar seu estado.
 
 ```
 {
+  "id": "3a8d1e05-6f2c-4b91-8840-d9e2358b1c47",
+  "source": "SERVICE.FRONTEND",
+  "contentType": "application/json",
+  "data": {
     "id": "661211f1-921e-4100-9280-de1578f4dc0f"
+  }
 }
 ```
 
@@ -259,7 +274,7 @@ Resposta com dados do relato requisitado. Os estados que um relato pode apresent
 - RELATO_VALIDADO: Relato que já foi confirmado pelos usuários como verdadeiro;
 - REJEITADO: Marca que o relato é falso ou o acontecimento reportado não está mais acontecendo.
 
-* **Routing Key:** `validacaorelato.relato`
+* **Routing Key:** `EVENTS.VALIDATIONRESPONSE.REPORT`
 
 #### Estrutura do Payload recebido
 
@@ -280,17 +295,22 @@ Resposta com dados do relato requisitado. Os estados que um relato pode apresent
 
 ```
 {
-  "id": "661211f1-921e-4100-9280-de1578f4dc0f",
-  "usuario_id": "d3b07384-d113-4ec2-a499-e82fa7ceef88",
-  "tipo": "Flooding",
-  "descricao": "Rua do centro está alagada devido a chuva",
-  "latitude": -20.8956,
-  "longitude": -48.2867
-  "estado": "RELATO_VALIDADO",
-  "votos_positivos": 10,
-  "votos_negativos": 1,
-  "criado_em": "2026-11-02T11:08:54.059867-03:00",
-  "proxima_avaliacao_em": "2026-11-02T12:20:23.159327-03:00",
-  "atualizado_em": "2026-11-02T11:20:23.159327-03:00"
+  "id": "3a8d1e05-6f2c-4b91-8840-d9e2358b1c47",
+  "source": "SERVICE.FRONTEND",
+  "contentType": "application/json",
+  "data": {
+    "id": "661211f1-921e-4100-9280-de1578f4dc0f",
+    "usuario_id": "d3b07384-d113-4ec2-a499-e82fa7ceef88",
+    "tipo": "Flooding",
+    "descricao": "Rua do centro está alagada devido a chuva",
+    "latitude": -20.8956,
+    "longitude": -48.2867
+    "estado": "RELATO_VALIDADO",
+    "votos_positivos": 10,
+    "votos_negativos": 1,
+    "criado_em": "2026-11-02T11:08:54.059867-03:00",
+    "proxima_avaliacao_em": "2026-11-02T12:20:23.159327-03:00",
+    "atualizado_em": "2026-11-02T11:20:23.159327-03:00"
+  }
 }
 ```

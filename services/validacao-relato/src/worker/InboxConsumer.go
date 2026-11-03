@@ -23,6 +23,13 @@ func NewInboxConsumer(channel *amqp.Channel, repo repository.RelatoRepository, s
 	return &InboxConsumer{channel: channel, repo: repo, svc: svc}
 }
 
+type EventEnvelope struct {
+	ID          string          `json:"id"`          // UUID v4 único da mensagem
+	Source      string          `json:"source"`      // Identificador do serviço emissor
+	ContentType string          `json:"contentType"` // MIME type (ex: application/json)
+	Data        json.RawMessage `json:"data"`        // Payload contextual do evento
+}
+
 func (c *InboxConsumer) StartConsuming(ctx context.Context) error {
 	msgs, err := c.channel.Consume(
 		"validacao_relatos_queue", // nome da fila
@@ -41,24 +48,53 @@ func (c *InboxConsumer) StartConsuming(ctx context.Context) error {
 
 	go func() {
 		for d := range msgs {
+			// Desenvelopando mensagem
+			var envelope EventEnvelope
+			if err := json.Unmarshal(d.Body, &envelope); err != nil {
+				log.Printf("[INBOX] Erro ao decodificar EventEnvelope: %v", err)
+				_ = d.Nack(false, false)
+				continue
+			}
+
 			// Extraímos ou geramos um ID único para a mensagem recebida.
-			// O ideal é que o remetente envie o ID no MessageId do AMQP ou dentro do JSON.
-			// No internal/queue/inbox_consumer.go, ajuste a obtenção do msgID:
-			msgID := d.MessageId
+			msgID := envelope.ID
 			if msgID == "" {
-				msgID = d.CorrelationId
+				msgID = d.MessageId
 				if msgID == "" {
-					msgID = uuid.New().String()
+					msgID = d.CorrelationId
+					if msgID == "" {
+						msgID = uuid.New().String()
+					}
 				}
 			}
 
 			eventType := d.RoutingKey
-			payload := d.Body
+			payload := envelope.Data
 
 			// Definimos a regra de negócio que será executada de forma idempotente
 			handler := func() error {
 				switch eventType {
-				case "validacaorelato.criar":
+
+				case "EVENTS.REPORT.CREATED":
+					var req struct {
+						ID        string  `json:"id"`
+						UsuarioID string  `json:"user_id"`
+						Tipo      string  `json:"type"`
+						Descricao string  `json:"descricao"`
+						Latitude  float64 `json:"latitude"`
+						Longitude float64 `json:"longitude"`
+					}
+
+					if err := json.Unmarshal(payload, &req); err != nil {
+						return fmt.Errorf("erro ao decodificar JSON de criação: %w", err)
+					}
+
+					_, err := c.svc.CriarRelato(ctx, req.ID, req.UsuarioID, req.Tipo, req.Descricao, req.Latitude, req.Longitude)
+					if err != nil {
+						return err
+					}
+
+				case "EVENTS.VALIDATION.CREATE":
 					var req struct {
 						ID        string  `json:"id"`
 						UsuarioID string  `json:"usuario_id"`
@@ -77,7 +113,7 @@ func (c *InboxConsumer) StartConsuming(ctx context.Context) error {
 						return err
 					}
 
-				case "validacaorelato.votar":
+				case "EVENTS.VALIDATION.VOTE":
 					var req struct {
 						ID   string `json:"id"`
 						Tipo string `json:"tipo"`
@@ -96,7 +132,7 @@ func (c *InboxConsumer) StartConsuming(ctx context.Context) error {
 						return err
 					}
 
-				case "validacaorelato.atualizar":
+				case "EVENTS.VALIDATION.UPDATE":
 					var req struct {
 						ID        string             `json:"id"`
 						Tipo      string             `json:"tipo"`
@@ -114,7 +150,7 @@ func (c *InboxConsumer) StartConsuming(ctx context.Context) error {
 						return err
 					}
 
-				case "validacaorelato.deletar":
+				case "EVENTS.VALIDATION.DELETE":
 					var req struct {
 						ID string `json:"id"`
 					}
@@ -127,7 +163,7 @@ func (c *InboxConsumer) StartConsuming(ctx context.Context) error {
 						return err
 					}
 
-				case "validacaorelato.buscar":
+				case "EVENTS.VALIDATION.SEARCH":
 					var req struct {
 						ID string `json:"id"`
 					}
@@ -145,7 +181,7 @@ func (c *InboxConsumer) StartConsuming(ctx context.Context) error {
 			}
 
 			// Processa utilizando o Inbox Pattern no banco de dados
-			err := c.repo.ProcessarInbox(ctx, msgID, eventType, payload, handler)
+			err := c.repo.ProcessarInbox(ctx, msgID, eventType, d.Body, handler)
 			if err != nil {
 				log.Printf("[INBOX] Erro ao processar mensagem %s: %v", msgID, err)
 				// Rejeita a mensagem e coloca de volta na fila (requeue = true) ou manda para DLQ
