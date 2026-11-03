@@ -54,8 +54,8 @@ func (w *OutboxWorker) dispatchPendingMessages(ctx context.Context) {
 		// Publica no RabbitMQ
 		err = w.channel.PublishWithContext(
 			ctx,
-			"validacao_relatos_exchange", // exchange
-			msg.EventType,                // routing key
+			"exchange.ecopulse", // exchange
+			msg.EventType,       // routing key
 			false,
 			false,
 			amqp.Publishing{
