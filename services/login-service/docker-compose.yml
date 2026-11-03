@@ -1,0 +1,68 @@
+services:
+
+  # Banco de dados
+  postgres:
+    image: postgres:17-alpine
+    container_name: ecopulse-postgres
+    environment:
+      POSTGRES_DB: ecopulse_auth
+      POSTGRES_USER: ecopulse
+      POSTGRES_PASSWORD: ecopulse_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ecopulse -d ecopulse_auth"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # RabbitMQ
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: ecopulse-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: ecopulse
+      RABBITMQ_DEFAULT_PASS: ecopulse_dev
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # Microsserviço de Login
+  login-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ecopulse-login
+    ports:
+      - "8080:8080"
+    environment:
+      JWT_SECRET: "ecopulse-segredo-local-123456789012345"
+
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USERNAME: ecopulse
+      DB_PASSWORD: ecopulse_dev
+      DB_NAME: ecopulse_auth
+
+      RABBITMQ_URL: "amqp://ecopulse:ecopulse_dev@rabbitmq:5672/"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  rabbitmq_data:
