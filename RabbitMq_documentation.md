@@ -143,3 +143,174 @@ Publicado quando a mensagem recebida possui formato válido, mas viola regras de
   }
 }
 ```
+
+---
+
+# Especificação de Mensageria: Microsserviço Report Validation
+
+## 1. Visão Geral
+
+Este documento descreve a para o Microsserviço Report Validation usando o RabbitMQ. O microsserviço consome eventos de criação de relatos, votação para validação e busca de relato com seu estado de validação e publica eventos de resposta.
+
+Quando um relato é criado ele apresenta datas de criação, de próxima avaliação e a última vez que foi atualizado. Inicialmente o relato é publicado com estado "POSSIVEL_RELATO" e com a próxima avaliação para o horário 15 minutos à frente da data de criação. Se o número de votos positivos for maior que o negativo o estado é atualizado para "RELATO_VALIDADO" e a hora de avaliação é colocada para 1 hora depois da atualização, caso contrário será atualizado para "REJEITADO". Após a 1 hora que o relato foi validado ele retorna ao estado de "POSSIVEL_RELATO" e seus votos são reiniciados.
+
+---
+
+## 2. Topologia RabbitMQ
+
+| Parâmetro | Detalhes |
+| :--- | :--- |
+| **Exchange** | `exchange.ecopulse` |
+| **Exchange Type** | `topic` |
+| **Codificação** | UTF-8 (`application/json`) |
+
+---
+
+## 3 Dicionário de Eventos
+
+### 3.1 Evento de entrada: Criação de cópia local do Relato
+
+Consumido para criar uma cópia do relato original, com seu id e outras informações, para registrar os votos.
+
+* **Routing Key:** `EVENTS.VALIDATION.CREATE`
+
+#### Estrutura do Payload
+
+| Campo | Tipo | Obrigatório | Descrição |
+| :--- | :--- | :--- | :--- |
+| `id` | `UUID` | Sim | Identificador primário da ocorrência gerada pelo cliente/emissor |
+| `tipo` | `string` | Sim | Categoria da ocorrência (ex.: `"Flooding"`, `"Landslide"`) |
+| `descricao` | `string` | Sim | Descrição do relato |
+| `usuario_id` | `UUID` | Sim | Identificador do usuário que registrou a ocorrência |
+| `latitude` | `float64` | Sim | Coordenada de latitude do evento |
+| `longitude` | `float64` | Sim | Coordenada de longitude do evento |
+
+
+#### Exemplo de Mensagem
+
+```
+{
+  "id": "3a8d1e05-6f2c-4b91-8840-d9e2358b1c47",
+  "source": "SERVICE.FRONTEND",
+  "contentType": "application/json",
+  "data": {
+      "id": "661211f1-921e-4100-9280-de1578f4dc0f",
+      "usuario_id": "d3b07384-d113-4ec2-a499-e82fa7ceef88",
+      "tipo": "Flooding",
+      "descricao": "Rua do centro está alagada devido a chuva",
+      "latitude": -20.8956,
+      "longitude": -48.2867
+  }
+}
+```
+
+### 3.2 Evento de Saída: Relato Criado com Sucesso
+
+Recebido como resposta para confirmar que a cópia do relato foi criada
+
+* **Routing Key:** `EVENTS.VALIDATIONRESPONSE.CREATED`
+
+### 3.3 Evento de Entrada: Votar no Relato para Validação
+
+Consumido para realizar a votação para confirmar o relato. Este evento ira receber votos positivos e votos negativos. O primeiro são votos de confirmação do relato e, o segundo de rejeição.
+
+* **Routing Key:** `EVENTS.VALIDATION.VOTE`
+
+#### Estrutura do Payload
+
+| Campo | Tipo | Obrigatório | Descrição |
+| :--- | :--- | :--- | :--- |
+| `id` | `UUID` | Sim | Identificador primário do relato que deseja vota |
+| `tipo` | `string` | Sim | Tipo do voto (deve receber "positivo" ou "negativo") |
+
+#### Exemplo de Mensagem
+
+```
+{
+  "id": "3a8d1e05-6f2c-4b91-8840-d9e2358b1c47",
+  "source": "SERVICE.FRONTEND",
+  "contentType": "application/json",
+  "data": {
+    "id": "661211f1-921e-4100-9280-de1578f4dc0f",
+    "tipo": "positivo"
+  }
+}
+```
+
+### 3.4 Evento de Saída: Voto confirmado
+
+Resposta gerada pelo evento de votação para confirmar que o voto foi realizado
+
+* **Routing Key:** `EVENTS.VALIDATIONRESPONSE.VOTED`
+
+### 3.5 Evento de Entrada: Busca de relato por id
+
+Consumido para buscar relato e confirmar seu estado.
+
+* **Routing Key:** `EVENTS.VALIDATION.SEARCH`
+
+#### Estrutura do Payload (`data`)
+
+| Campo | Tipo | Obrigatório | Descrição |
+| :--- | :--- | :--- | :--- |
+| `id` | `UUID` | Sim | Identificador primário do relato que deseja buscar |
+
+```
+{
+  "id": "3a8d1e05-6f2c-4b91-8840-d9e2358b1c47",
+  "source": "SERVICE.FRONTEND",
+  "contentType": "application/json",
+  "data": {
+    "id": "661211f1-921e-4100-9280-de1578f4dc0f"
+  }
+}
+```
+
+### 3.6 Evento de Saída: Dados do Relato Requisitado
+
+Resposta com dados do relato requisitado. Os estados que um relato pode apresentar é:
+
+- POSSIVEL_RELATO: Um relato ainda não confirmado;
+- RELATO_VALIDADO: Relato que já foi confirmado pelos usuários como verdadeiro;
+- REJEITADO: Marca que o relato é falso ou o acontecimento reportado não está mais acontecendo.
+
+* **Routing Key:** `EVENTS.VALIDATIONRESPONSE.REPORT`
+
+#### Estrutura do Payload recebido
+
+| Campo | Tipo | Descrição |
+| :--- | :--- | :--- |
+| `id` | `UUID` | Identificador primário da ocorrência gerada pelo cliente/emissor |
+| `tipo` | `string` | Categoria da ocorrência (ex.: `"Flooding"`, `"Landslide"`) |
+| `descricao` | `string` | Descrição do relato |
+| `usuario_id` | `UUID` | Identificador do usuário que registrou a ocorrência |
+| `latitude` | `float64`| Coordenada de latitude do evento |
+| `longitude` | `float64` | Coordenada de longitude do evento |
+| `votos_positivos` | `int` | Votos de confirmação do relato |
+| `votos_negativos` | `int` | Votos de rejeição do relato |
+| `estado` | `string` | Estado de validação do relato (POSSIVEL_RELATO, RELATO_VALIDADO e REJEITADO) |
+
+
+#### Exemplo de Mensagem
+
+```
+{
+  "id": "3a8d1e05-6f2c-4b91-8840-d9e2358b1c47",
+  "source": "SERVICE.FRONTEND",
+  "contentType": "application/json",
+  "data": {
+    "id": "661211f1-921e-4100-9280-de1578f4dc0f",
+    "usuario_id": "d3b07384-d113-4ec2-a499-e82fa7ceef88",
+    "tipo": "Flooding",
+    "descricao": "Rua do centro está alagada devido a chuva",
+    "latitude": -20.8956,
+    "longitude": -48.2867
+    "estado": "RELATO_VALIDADO",
+    "votos_positivos": 10,
+    "votos_negativos": 1,
+    "criado_em": "2026-11-02T11:08:54.059867-03:00",
+    "proxima_avaliacao_em": "2026-11-02T12:20:23.159327-03:00",
+    "atualizado_em": "2026-11-02T11:20:23.159327-03:00"
+  }
+}
+```

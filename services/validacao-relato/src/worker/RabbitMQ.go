@@ -28,13 +28,13 @@ func NewRabbitMQConn(url string) (*RabbitMQConn, error) {
 	// 3. Declara a Exchange do tipo 'topic'
 	// O tipo 'topic' permite roteamento flexível usando padrões (wildcards)
 	err = ch.ExchangeDeclare(
-		"validacao_relatos_exchange", // Nome da exchange
-		"topic",                      // Tipo topic
-		true,                         // Durable (sobrevive a reinicializações do RabbitMQ)
-		false,                        // Auto-deleted
-		false,                        // Internal
-		false,                        // No-wait
-		nil,                          // Arguments
+		"exchange.ecopulse", // Nome da exchange
+		"topic",             // Tipo topic
+		true,                // Durable (sobrevive a reinicializações do RabbitMQ)
+		false,               // Auto-deleted
+		false,               // Internal
+		false,               // No-wait
+		nil,                 // Arguments
 	)
 	if err != nil {
 		return nil, fmt.Errorf("falha ao declarar exchange: %w", err)
@@ -45,7 +45,8 @@ func NewRabbitMQConn(url string) (*RabbitMQConn, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = ch.QueueBind(filaValidacao, "validacaorelato.*", "validacao_relatos_exchange", false, nil)
+	err = ch.QueueBind(filaValidacao, "EVENTS.VALIDATION.*", "exchange.ecopulse", false, nil)
+	err = ch.QueueBind(filaValidacao, "EVENTS.REPORT.CREATED", "exchange.ecopulse", false, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -57,8 +58,8 @@ func NewRabbitMQConn(url string) (*RabbitMQConn, error) {
 	}
 	err = ch.QueueBind(
 		filaResposta,
-		"validacaoresposta.*", // Padrão que vai cair nesta nova fila
-		"validacao_relatos_exchange",
+		"EVENTS.VALIDATIONRESPONSE.*", // Padrão que vai cair nesta nova fila
+		"exchange.ecopulse",
 		false,
 		nil,
 	)
