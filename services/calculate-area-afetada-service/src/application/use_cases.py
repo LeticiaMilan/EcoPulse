@@ -74,5 +74,6 @@ def _snapshot(area: AffectedArea) -> dict:
         "center": {"latitude": center_lat, "longitude": center_lng},
         "polygon": area.geojson,
         "reports": len(area.reports),
+        "report_ids": [str(r.report_id) for r in area.reports],
         "users": area.distinct_users,
     }
