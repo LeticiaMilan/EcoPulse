@@ -1,8 +1,12 @@
 package delivery
 
 import (
+	"report-service/internal/application"
 	"report-service/internal/domain"
 	"report-service/internal/infraestructure/persistence/postgres/db"
+	"time"
+
+	"github.com/google/uuid"
 )
 
 func MapInboxApplicationToModel(inboxApplication *domain.Inbox) *db.Inbox {
@@ -29,7 +33,7 @@ func MapReportModelToApplication(reportModel *db.Report) *domain.Report {
 		Type:      domain.ReportType(reportModel.Type.String),
 		Status:    domain.ReportStatus(reportModel.Status.String),
 		UserID:    reportModel.ID,
-		Area:      domain.AffectedArea{},
+		Area:      uuid.UUID{},
 		Datetime:  reportModel.Datetime.Time,
 	}
 }
@@ -45,7 +49,7 @@ func MapOutboxModelToApplication(outboxModel *db.Outbox) *domain.Outbox {
 	}
 }
 
-func MapReportGeneratedDTOToApplication(dto *ReportGeneratedEventDTO) *domain.Report {
+func MapReportGeneratedDTOToApplication(dto *application.ReportGeneratedEventDTO) *domain.Report {
 	return &domain.Report{
 		ID:        dto.ID,
 		Latitude:  dto.Latitude,
@@ -54,5 +58,34 @@ func MapReportGeneratedDTOToApplication(dto *ReportGeneratedEventDTO) *domain.Re
 		Status:    domain.InProgress,
 		UserID:    dto.UserID,
 		Datetime:  dto.Datetime,
+	}
+}
+
+func MapReportValidatedDTOToApplication(dto *application.ReportValidatedEventDTO) *domain.Report {
+	return &domain.Report{
+		ID:        dto.ID,
+		Latitude:  dto.Latitude,
+		Longitude: dto.Longitude,
+		Type:      domain.ReportType(dto.Tipo),
+		Status:    domain.ReportStatus(dto.Estado),
+		UserID:    dto.UserID,
+		Area:      uuid.UUID{},
+		Datetime:  time.Time{},
+	}
+}
+
+func MapReportAffectedAreaDTOToApplication(dto *application.ReportAreaDefinedEventDTO) *domain.Area {
+	return &domain.Area{
+		Id:      dto.Area_id,
+		Type:    dto.Type,
+		Status:  dto.Status,
+		Area_M2: dto.Area_M2,
+		Center: domain.AreaCenter{
+			Latitude:  dto.Center.Latitude,
+			Longitude: dto.Center.Longitude,
+		},
+		Polygon: dto.Polygon,
+		Reports: dto.Reports,
+		Users:   dto.Users,
 	}
 }

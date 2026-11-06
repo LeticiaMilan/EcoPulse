@@ -25,6 +25,18 @@ CREATE TABLE IF NOT EXISTS report(
     longitude    FLOAT,
     type         VARCHAR(50),
     status       VARCHAR(50),
+    area UUID NULL REFERENCES affected_areas(id) ON DELETE SET NULL,
     user_id      UUID       NOT NULL,
     datetime     timestamptz
+);
+
+CREATE TABLE IF NOT EXISTS affected_areas (
+    id UUID PRIMARY KEY,
+    type VARCHAR(50) NOT NULL,
+    status VARCHAR(30) NOT NULL,
+    area_m2 NUMERIC(12, 2) NOT NULL,
+    center_lat DOUBLE PRECISION NOT NULL,
+    center_lng DOUBLE PRECISION NOT NULL,
+    polygon JSONB NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

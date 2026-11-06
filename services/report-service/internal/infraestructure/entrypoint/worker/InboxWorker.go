@@ -80,11 +80,6 @@ func (i *InboxWorker) Run(ctx context.Context) error {
 					if err != nil {
 						log.Printf("Error while saving outbox: %v", err)
 					}
-				case string(domain.InboxRejectedReportEvent):
-					err = i.OutboxRepository.Save(ctx, domain.NewOutbox(domain.OutboxReportRejectedError, content))
-					if err != nil {
-						log.Printf("Error while saving outbox: %v", err)
-					}
 				case string(domain.InboxAreaDefinedReportEvent):
 					err = i.OutboxRepository.Save(ctx, domain.NewOutbox(domain.OutboxReportDefinedAreaError, content))
 					if err != nil {

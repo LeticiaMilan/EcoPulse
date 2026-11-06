@@ -29,10 +29,10 @@ func IsDomainValidationError(err error) bool {
 type ReportStatus string
 
 const (
-	Created    ReportStatus = "created"    // Estado final (Já pode ser sincronizado)
-	InProgress ReportStatus = "inProgress" // Usuário criou, mas ainda não foi liberado
-	Validated  ReportStatus = "validated"  // Etapa de validação por outros usuários
-	Rejected   ReportStatus = "rejected"
+	Created    ReportStatus = "created"         // Estado final (Já pode ser sincronizado)
+	InProgress ReportStatus = "inProgress"      // Usuário criou, mas ainda não foi liberado
+	Validated  ReportStatus = "RELATO_VALIDADO" // Etapa de validação por outros usuários
+	Rejected   ReportStatus = "REJEITADO"
 )
 
 type ReportType string
@@ -44,8 +44,6 @@ const (
 	FireDisaster ReportType = "Fire Disaster" // Incendios
 )
 
-type AffectedArea struct{}
-
 type Report struct {
 	ID        uuid.UUID
 	Latitude  float64
@@ -53,7 +51,7 @@ type Report struct {
 	Type      ReportType
 	Status    ReportStatus
 	UserID    uuid.UUID
-	Area      AffectedArea
+	Area      uuid.UUID
 	Datetime  time.Time
 }
 
@@ -67,7 +65,6 @@ func (r *Report) Validate() error {
 	if err := r.isUserValid(); err != nil {
 		return err
 	}
-	// 4a validação: Área afetada >= 0
 
 	return nil
 }

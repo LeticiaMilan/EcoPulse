@@ -22,7 +22,7 @@ type ReportPostgresModel struct {
 	UserID    uuid.UUID `db:"user_id"`
 	Datetime  time.Time `db:"datetime"`
 	Status    string    `db:"status"`
-	//Area      AffectedArea
+	Area      uuid.UUID `db:"area"`
 }
 
 type ReportRepositoryImpl struct {
@@ -58,6 +58,7 @@ func newCreateReportParams(report *domain.Report) db.CreateReportParams {
 		Status:    status,
 		UserID:    report.UserID,
 		Datetime:  datetime,
+		Area:      report.Area,
 	}
 }
 
@@ -101,18 +102,17 @@ func (r *ReportRepositoryImpl) Reject(ctx context.Context, report *domain.Report
 }
 
 func (r *ReportRepositoryImpl) DefineArea(ctx context.Context, report *domain.Report) (*domain.Report, error) {
-	/*
-		Query := r.GetExecutor(ctx)
+	Query := r.GetExecutor(ctx)
+	reportOutput, err := Query.DefineAreaReport(ctx,
+		db.DefineAreaReportParams{
+			Area: report.ID,
+			ID:   report.Area,
+		})
 
-		reportOutput, err := Query.DefineAreaReport(ctx, report.ID, report.Area)
-
-		if err != nil {
-				return nil, err
-			}
-			return delivery.MapReportModelToApplication(&reportOutput), nil
-	*/
-
-	return nil, nil
+	if err != nil {
+		return nil, err
+	}
+	return delivery.MapReportModelToApplication(&reportOutput), nil
 }
 
 func (r *ReportRepositoryImpl) GetExecutor(ctx context.Context) *db.Queries {
