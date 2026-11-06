@@ -3,7 +3,6 @@ package events
 import (
 	"database/sql"
 	"encoding/json"
-	"time"
 
 	"github.com/google/uuid"
 )
@@ -24,12 +23,11 @@ WHERE published_at IS NULL;
 `
 
 // Estrutura padrão dos eventos
-type Event struct {
-	EventID    string    `json:"event_id"`
-	EventType  string    `json:"event_type"`
-	Version    int       `json:"version"`
-	OccurredAt time.Time `json:"occurred_at"`
-	Data       any       `json:"data"`
+type EventEnvelope struct {
+	ID          string          `json:"id"`
+	Source      string          `json:"source"`
+	ContentType string          `json:"contentType"`
+	Data        json.RawMessage `json:"data"`
 }
 
 // Registra um evento dentro da transação recebida
@@ -39,13 +37,20 @@ func SaveOutboxEvent(
 	routingKey string,
 	data any,
 ) error {
+	eventID := uuid.NewString()
 
-	event := Event{
-		EventID:    uuid.NewString(),
-		EventType:  eventType,
-		Version:    1,
-		OccurredAt: time.Now().UTC(),
-		Data:       data,
+	// Serializa somente o payload específico do evento.
+	eventData, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+
+	// Monta o novo envelope.
+	event := EventEnvelope{
+		ID:          eventID,
+		Source:      "login-service",
+		ContentType: "application/json",
+		Data:        eventData,
 	}
 
 	payload, err := json.Marshal(event)
@@ -53,13 +58,12 @@ func SaveOutboxEvent(
 		return err
 	}
 
-	_, err = tx.Exec(`
-		INSERT INTO outbox_events
-		(id, event_type, routing_key, payload)
-		VALUES ($1, $2, $3, $4)
-	`,
-		event.EventID,
-		event.EventType,
+	_, err = tx.Exec(
+		`INSERT INTO outbox_events
+        (id, event_type, routing_key, payload)
+        VALUES ($1, $2, $3, $4)`,
+		eventID,
+		eventType,
 		routingKey,
 		string(payload),
 	)

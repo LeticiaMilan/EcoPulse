@@ -199,10 +199,9 @@ Todas as mensagens seguem o mesmo padrão:
 
 ``` json
 {
-  "event_id": "uuid",
-  "event_type": "UserRegistered",
-  "version": 1,
-  "occurred_at": "2026-01-01T12:00:00Z",
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "source": "login-service",
+  "contentType": "application/json",
   "data": {
     "user_id": 1,
     "username": "usuario"
