@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"log"
+	"net/http"
+	http2 "report-service/internal/infraestructure/http"
 
 	"os"
 	"os/signal"
@@ -59,6 +61,23 @@ func main() {
 	inboxWorker := worker.NewInboxWorker(InboxRepository, Inboxprocessor, OutboxRepository)
 	go inboxWorker.Process(ctx)
 	go OutboxWorker.Process(ctx)
+
+	HttpHandler := http2.NewHttpReportHandler(reportUseCase)
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /report/api/sync", HttpHandler.HandlerReportSync)
+
+	srv := &http.Server{
+		Addr:         ":8080",
+		Handler:      mux,
+		WriteTimeout: 15 * time.Second,
+		ReadTimeout:  15 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
+
+	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		log.Fatalf("Erro ao iniciar o servidor: %v", err)
+	}
 
 	<-ctx.Done()
 }

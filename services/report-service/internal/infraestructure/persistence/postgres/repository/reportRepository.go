@@ -129,3 +129,42 @@ func (r *ReportRepositoryImpl) BeginTransaction(ctx context.Context) (pgx.Tx, er
 	}
 	return tx, nil
 }
+
+func (r *ReportRepositoryImpl) GetReportSync(ctx context.Context, time time.Time, limit int) ([]domain.ReportWithAreaDTO, error) {
+	Query := r.GetExecutor(ctx)
+	rows, err := Query.GetReportsWithArea(ctx, db.GetReportsWithAreaParams{
+		Datetime: pgtype.Timestamptz{
+			Time:             time,
+			InfinityModifier: 0,
+			Valid:            true,
+		},
+		Limit: int32(limit),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var reports []domain.ReportWithAreaDTO
+	for _, row := range rows {
+		reports = append(reports, domain.ReportWithAreaDTO{
+			ID:        row.ReportID,
+			Latitude:  row.Latitude.Float64,
+			Longitude: row.Longitude.Float64,
+			Type:      row.ReportType.String,
+			Status:    row.ReportStatus.String,
+			UserID:    row.UserID,
+			Datetime:  row.Datetime.Time,
+			Area: domain.ReportAffectedAreaDTO{
+				ID:        row.AreaID,
+				Type:      row.AreaType,
+				Status:    row.AreaStatus,
+				AreaM2:    row.AreaM2,
+				CenterLat: row.CenterLat,
+				CenterLng: row.CenterLng,
+				Polygon:   row.Polygon,
+				UpdatedAt: row.AreaUpdatedAt.Time,
+			},
+		})
+	}
+	return reports, nil
+}

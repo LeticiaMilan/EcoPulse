@@ -23,15 +23,11 @@ func NewAreaRepository(pool *pgxpool.Pool) *AreaRepositoryImpl {
 }
 
 func (repo *AreaRepositoryImpl) Save(ctx context.Context, area *domain.Area) error {
-	var num pgtype.Numeric
-	if err := num.Scan(area.Area_M2); err != nil {
-		return err
-	}
 	params := db.CreateAreaParams{
 		ID:        area.Id,
 		Type:      area.Type,
 		Status:    area.Status,
-		AreaM2:    num,
+		AreaM2:    area.Area_M2,
 		CenterLat: area.Center.Latitude,
 		CenterLng: area.Center.Longitude,
 		Polygon:   area.Polygon,

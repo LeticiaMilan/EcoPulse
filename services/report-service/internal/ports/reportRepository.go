@@ -4,6 +4,7 @@ import (
 	"context"
 	"report-service/internal/domain"
 	"report-service/internal/infraestructure/persistence/postgres/db"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -15,4 +16,5 @@ type ReportRepository interface {
 	DefineArea(ctx context.Context, report *domain.Report) (*domain.Report, error)
 	GetExecutor(ctx context.Context) *db.Queries
 	BeginTransaction(ctx context.Context) (pgx.Tx, error)
+	GetReportSync(ctx context.Context, time time.Time, limit int) ([]domain.ReportWithAreaDTO, error)
 }

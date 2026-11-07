@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"encoding/json"
 	"errors"
 	"time"
 
@@ -14,6 +15,30 @@ var (
 	ErrInvalidDatetime    = errors.New("Data inválida")
 	ErrInvalidUser        = errors.New("Usuário inválido/nulo")
 )
+
+// AffectedArea representa a tabela affected_areas
+type ReportAffectedAreaDTO struct {
+	ID        uuid.UUID       `json:"id"`
+	Type      string          `json:"type"`
+	Status    string          `json:"status"`
+	AreaM2    float64         `json:"area_m2"`
+	CenterLat float64         `json:"center_lat"`
+	CenterLng float64         `json:"center_lng"`
+	Polygon   json.RawMessage `json:"polygon"` // Lê o JSONB nativamente
+	UpdatedAt time.Time       `json:"updated_at"`
+}
+
+// ReportWithArea representa o join e o formato final da resposta HTTP
+type ReportWithAreaDTO struct {
+	ID        uuid.UUID             `json:"id"`
+	Latitude  float64               `json:"latitude"`
+	Longitude float64               `json:"longitude"`
+	Type      string                `json:"type"`
+	Status    string                `json:"status"`
+	UserID    uuid.UUID             `json:"user_id"`
+	Datetime  time.Time             `json:"datetime"`
+	Area      ReportAffectedAreaDTO `json:"area"`
+}
 
 func IsDomainValidationError(err error) bool {
 	if err == nil {
