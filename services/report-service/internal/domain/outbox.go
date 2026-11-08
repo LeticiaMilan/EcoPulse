@@ -22,7 +22,6 @@ const (
 	OutboxReportValidated        OutboxEventType = "EVENTS.REPORT.VALIDATED"
 	OutboxReportValidatedError   OutboxEventType = "EVENTS.REPORT.VALIDATED_ERROR"
 	OutboxReportRejected         OutboxEventType = "EVENTS.REPORT.REJECTED"
-	OutboxReportRejectedError    OutboxEventType = "EVENTS.REPORT.REJECTED_ERROR"
 	OutboxReportCreated          OutboxEventType = "EVENTS.REPORT.CREATED"
 	OutboxReportDefinedAreaError OutboxEventType = "EVENTS.REPORT.DEFINED_AREA_ERROR"
 )

@@ -12,6 +12,27 @@ import (
 	"github.com/google/uuid"
 )
 
+type ReportGeneratedEventDTO struct {
+	ID        uuid.UUID `json:"id"`
+	Latitude  float64   `json:"latitude"`
+	Longitude float64   `json:"longitude"`
+	Type      string    `json:"type"`
+	UserID    uuid.UUID `json:"user_id"`
+	Datetime  time.Time `json:"datetime"`
+}
+
+type ReportValidatedEventDTO struct {
+	ID              uuid.UUID `json:"id"`
+	UserID          uuid.UUID `json:"usuario_id"`
+	Tipo            string    `json:"tipo"`
+	Descricao       string    `json:"descricao"`
+	Latitude        float64   `json:"latitude"`
+	Longitude       float64   `json:"longitude"`
+	Votos_positivos int       `json:"votos_positivos"`
+	Votos_negativos int       `json:"votos_negativos"`
+	Estado          string    `json:"estado"`
+}
+
 type ReportUseCase struct {
 	ReportRepository ports.ReportRepository
 	OutboxRepository ports.OutboxRepository
@@ -99,77 +120,72 @@ func NewValidatedReport(ReportUseCase *ReportUseCase) *ValidatedReportUseCase {
 
 func (uc *ValidatedReportUseCase) Execute(ctx context.Context, report *domain.Report) error {
 
-	report, err := uc.ReportUseCase.ReportRepository.Validate(ctx, report)
+	switch report.Status {
+	case domain.Validated:
+		report, err := uc.ReportUseCase.ReportRepository.Validate(ctx, report)
 
-	if err != nil {
-		return err
-	}
+		if err != nil {
+			return err
+		}
 
-	reportDTO := MapReportToReportDTO(report)
-	content, err := json.Marshal(reportDTO)
+		reportDTO := MapReportToReportDTO(report)
+		content, err := json.Marshal(reportDTO)
 
-	outbox := domain.NewOutbox(domain.OutboxReportValidated, content)
+		outbox := domain.NewOutbox(domain.OutboxReportValidated, content)
 
-	if err := uc.ReportUseCase.OutboxRepository.Save(ctx, outbox); err != nil {
-		return err
-	}
-	return nil
-}
+		if err := uc.ReportUseCase.OutboxRepository.Save(ctx, outbox); err != nil {
+			return err
+		}
+		return nil
+	case domain.Rejected:
+		report, err := uc.ReportUseCase.ReportRepository.Reject(ctx, report)
 
-type RejectedReportUseCase struct {
-	ReportUseCase *ReportUseCase
-}
+		if err != nil {
+			return err
+		}
 
-func NewRejectedReport(ReportUseCase *ReportUseCase) *RejectedReportUseCase {
-	return &RejectedReportUseCase{
-		ReportUseCase: ReportUseCase,
-	}
-}
-func (uc *RejectedReportUseCase) Execute(ctx context.Context, report *domain.Report) error {
-	report, err := uc.ReportUseCase.ReportRepository.Reject(ctx, report)
+		reportDTO := MapReportToReportDTO(report)
+		content, err := json.Marshal(reportDTO)
 
-	if err != nil {
-		return err
-	}
+		outbox := domain.NewOutbox(domain.OutboxReportRejected, content)
 
-	reportDTO := MapReportToReportDTO(report)
-	content, err := json.Marshal(reportDTO)
-
-	outbox := domain.NewOutbox(domain.OutboxReportRejected, content)
-
-	if err := uc.ReportUseCase.OutboxRepository.Save(ctx, outbox); err != nil {
-		return err
+		if err := uc.ReportUseCase.OutboxRepository.Save(ctx, outbox); err != nil {
+			return err
+		}
+		return nil
 	}
 	return nil
 }
 
-type AreaDefinedReportUseCase struct {
-	ReportUseCase *ReportUseCase
-}
-
-func NewAreaDefinedReport(ReportUseCase *ReportUseCase) *AreaDefinedReportUseCase {
-	return &AreaDefinedReportUseCase{
-		ReportUseCase: ReportUseCase,
-	}
-}
-func (uc *AreaDefinedReportUseCase) Execute(ctx context.Context, report *domain.Report) error {
-	report, err := uc.ReportUseCase.ReportRepository.DefineArea(ctx, report)
-
-	if err != nil {
-		return err
+/*
+	type AreaDefinedReportUseCase struct {
+		ReportUseCase *ReportUseCase
 	}
 
-	reportDTO := MapReportToReportDTO(report)
-	content, err := json.Marshal(reportDTO)
-
-	outbox := domain.NewOutbox(domain.OutboxReportCreated, content)
-
-	if err := uc.ReportUseCase.OutboxRepository.Save(ctx, outbox); err != nil {
-		return err
+	func NewAreaDefinedReport(ReportUseCase *ReportUseCase) *AreaDefinedReportUseCase {
+		return &AreaDefinedReportUseCase{
+			ReportUseCase: ReportUseCase,
+		}
 	}
-	return nil
-}
 
+	func (uc *AreaDefinedReportUseCase) Execute(ctx context.Context, report *domain.Report) error {
+		report, err := uc.ReportUseCase.ReportRepository.DefineArea(ctx, report)
+
+		if err != nil {
+			return err
+		}
+
+		reportDTO := MapReportToReportDTO(report)
+		content, err := json.Marshal(reportDTO)
+
+		outbox := domain.NewOutbox(domain.OutboxReportCreated, content)
+
+		if err := uc.ReportUseCase.OutboxRepository.Save(ctx, outbox); err != nil {
+			return err
+		}
+		return nil
+	}
+*/
 type ReportDTO struct {
 	ID        uuid.UUID `json:"id"`
 	Latitude  float64   `json:"latitude"`

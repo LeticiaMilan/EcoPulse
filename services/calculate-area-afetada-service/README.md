@@ -221,6 +221,11 @@ Todos os eventos levam o estado atual completo da área em `data`:
       ]
     },
     "reports": 3,
+    "report_ids": [
+      "8b1f6c2e-3a4d-4e5f-9a7b-1c2d3e4f5a6b",
+      "c3d4e5f6-7a8b-4c9d-8e0f-1a2b3c4d5e6f",
+      "f1e2d3c4-b5a6-4978-8a9b-0c1d2e3f4a5b"
+    ],
     "users": 3
   }
 }
@@ -240,6 +245,8 @@ Campos de `data`:
 -   `polygon`: polígono no formato GeoJSON. **As coordenadas seguem a
     ordem do GeoJSON: `[longitude, latitude]`.**
 -   `reports`: quantidade de relatos na área.
+-   `report_ids`: IDs dos relatos que fazem parte da área. É o que liga
+    cada relato à sua área (`area_id`).
 -   `users`: quantidade de usuários diferentes que relataram.
 
 Além do corpo, cada mensagem tem estas propriedades AMQP: `message_id`
@@ -306,5 +313,5 @@ Como o ciclo funciona:
 -   Para remover uma área do mapa, trate `RESOLVED` e `EXPIRED`.
 -   Áreas `candidate` existem só dentro deste serviço; nenhum evento é
     publicado para elas.
--   Os relatos individuais e os IDs dos usuários não são incluídos nos
-    eventos publicados, apenas as contagens `reports` e `users`.
+-   Os IDs dos relatos da área vão em `report_ids`. Os IDs dos usuários
+    não são incluídos, apenas a contagem `users`.

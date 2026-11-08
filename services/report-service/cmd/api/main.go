@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"log"
+	"net/http"
+	http2 "report-service/internal/infraestructure/http"
 
 	"os"
 	"os/signal"
@@ -30,6 +32,7 @@ func main() {
 	InboxRepository := repository.NewInboxRepository(pool)
 	OutboxRepository := repository.NewOutboxRepository(pool)
 	ReportRepository := repository.NewReportRepository(pool)
+	AreaRepository := repository.NewAreaRepository(pool)
 
 	// Escutar interrupções do S.O
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -45,21 +48,36 @@ func main() {
 	}
 
 	reportUseCase := application.NewReportUseCase(ReportRepository, BrasilNtpClock, OutboxRepository)
-
-	ReportGeneratedHandler := delivery.NewHandler(application.NewGeneratedReportUseCase(reportUseCase))
-	ReportValidatedHandler := delivery.NewHandler(application.NewValidatedReport(reportUseCase))
-	ReportRejectedHandler := delivery.NewHandler(application.NewRejectedReport(reportUseCase))
-	ReportDefinedAreaHandler := delivery.NewHandler(application.NewValidatedReport(reportUseCase))
+	AreaUseCase := application.NewAreaUseCase(AreaRepository, ReportRepository, OutboxRepository)
+	ReportGeneratedHandler := delivery.NewHandler[*domain.Report](application.NewGeneratedReportUseCase(reportUseCase))
+	ReportValidatedHandler := delivery.NewHandler[*domain.Report](application.NewValidatedReport(reportUseCase))
+	ReportDefinedAreaHandler := delivery.NewHandler[*domain.Area](application.NewAreaDefined(AreaUseCase))
 	Inboxprocessor := delivery.NewInboxProcessor()
 	Inboxprocessor.RegisterHandler(string(domain.InboxGeneratedReportEvent), ReportGeneratedHandler)
 	Inboxprocessor.RegisterHandler(string(domain.InboxValidatedReportEvent), ReportValidatedHandler)
-	Inboxprocessor.RegisterHandler(string(domain.InboxRejectedReportEvent), ReportRejectedHandler)
 	Inboxprocessor.RegisterHandler(string(domain.InboxAreaDefinedReportEvent), ReportDefinedAreaHandler)
 
 	OutboxWorker := worker.NewOutboxWorker(OutboxRepository, dispatcherChan)
 	inboxWorker := worker.NewInboxWorker(InboxRepository, Inboxprocessor, OutboxRepository)
 	go inboxWorker.Process(ctx)
 	go OutboxWorker.Process(ctx)
+
+	HttpHandler := http2.NewHttpReportHandler(reportUseCase)
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /report/api/sync", HttpHandler.HandlerReportSync)
+
+	srv := &http.Server{
+		Addr:         ":8080",
+		Handler:      mux,
+		WriteTimeout: 15 * time.Second,
+		ReadTimeout:  15 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
+
+	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		log.Fatalf("Erro ao iniciar o servidor: %v", err)
+	}
 
 	<-ctx.Done()
 }
@@ -102,6 +120,8 @@ func StartRabbit(ctx context.Context, inboxRepository ports.InboxRepository, out
 
 	var RoutingKeys []string
 	RoutingKeys = append(RoutingKeys, string(domain.InboxGeneratedReportEvent))
+	RoutingKeys = append(RoutingKeys, string(domain.InboxValidatedReportEvent))
+	RoutingKeys = append(RoutingKeys, string(domain.InboxAreaDefinedReportEvent))
 
 	consumer := amqp.NewConsumer(QueueManager, inboxRepository, "exchange.ecopulse", "topic", "queue.service.report", RoutingKeys)
 	ConsumerChannel, ReceivedMessages, err := consumer.Start()

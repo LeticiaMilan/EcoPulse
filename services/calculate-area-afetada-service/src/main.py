@@ -44,6 +44,11 @@ Mensagem de Saída:
       ]
     },
     "reports": 3,
+    "report_ids": [
+      "8b1f6c2e-3a4d-4e5f-9a7b-1c2d3e4f5a6b",
+      "c3d4e5f6-7a8b-4c9d-8e0f-1a2b3c4d5e6f",
+      "f1e2d3c4-b5a6-4978-8a9b-0c1d2e3f4a5b"
+    ],
     "users": 3
   }
 }

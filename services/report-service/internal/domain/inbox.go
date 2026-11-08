@@ -18,9 +18,8 @@ type InboxEventType string
 
 const (
 	InboxGeneratedReportEvent   InboxEventType = "EVENTS.REPORT.GENERATED"
-	InboxRejectedReportEvent    InboxEventType = "EVENTS.REPORT.REJECTED"
-	InboxValidatedReportEvent   InboxEventType = "EVENTS.REPORT.VALIDATED"
-	InboxAreaDefinedReportEvent InboxEventType = "EVENTS.REPORT.AREADEFINED"
+	InboxValidatedReportEvent   InboxEventType = "EVENTS.VALIDATIONRESPONSE.REPORT"
+	InboxAreaDefinedReportEvent InboxEventType = "EVENTS.AFFECTED_AREA.RESOLVED"
 )
 
 type Inbox struct {

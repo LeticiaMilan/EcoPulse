@@ -22,7 +22,7 @@ type ReportPostgresModel struct {
 	UserID    uuid.UUID `db:"user_id"`
 	Datetime  time.Time `db:"datetime"`
 	Status    string    `db:"status"`
-	//Area      AffectedArea
+	Area      uuid.UUID `db:"area"`
 }
 
 type ReportRepositoryImpl struct {
@@ -58,6 +58,7 @@ func newCreateReportParams(report *domain.Report) db.CreateReportParams {
 		Status:    status,
 		UserID:    report.UserID,
 		Datetime:  datetime,
+		Area:      report.Area,
 	}
 }
 
@@ -101,18 +102,17 @@ func (r *ReportRepositoryImpl) Reject(ctx context.Context, report *domain.Report
 }
 
 func (r *ReportRepositoryImpl) DefineArea(ctx context.Context, report *domain.Report) (*domain.Report, error) {
-	/*
-		Query := r.GetExecutor(ctx)
+	Query := r.GetExecutor(ctx)
+	reportOutput, err := Query.DefineAreaReport(ctx,
+		db.DefineAreaReportParams{
+			Area: report.ID,
+			ID:   report.Area,
+		})
 
-		reportOutput, err := Query.DefineAreaReport(ctx, report.ID, report.Area)
-
-		if err != nil {
-				return nil, err
-			}
-			return delivery.MapReportModelToApplication(&reportOutput), nil
-	*/
-
-	return nil, nil
+	if err != nil {
+		return nil, err
+	}
+	return delivery.MapReportModelToApplication(&reportOutput), nil
 }
 
 func (r *ReportRepositoryImpl) GetExecutor(ctx context.Context) *db.Queries {
@@ -128,4 +128,43 @@ func (r *ReportRepositoryImpl) BeginTransaction(ctx context.Context) (pgx.Tx, er
 		return nil, err
 	}
 	return tx, nil
+}
+
+func (r *ReportRepositoryImpl) GetReportSync(ctx context.Context, time time.Time, limit int) ([]domain.ReportWithAreaDTO, error) {
+	Query := r.GetExecutor(ctx)
+	rows, err := Query.GetReportsWithArea(ctx, db.GetReportsWithAreaParams{
+		Datetime: pgtype.Timestamptz{
+			Time:             time,
+			InfinityModifier: 0,
+			Valid:            true,
+		},
+		Limit: int32(limit),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var reports []domain.ReportWithAreaDTO
+	for _, row := range rows {
+		reports = append(reports, domain.ReportWithAreaDTO{
+			ID:        row.ReportID,
+			Latitude:  row.Latitude.Float64,
+			Longitude: row.Longitude.Float64,
+			Type:      row.ReportType.String,
+			Status:    row.ReportStatus.String,
+			UserID:    row.UserID,
+			Datetime:  row.Datetime.Time,
+			Area: domain.ReportAffectedAreaDTO{
+				ID:        row.AreaID,
+				Type:      row.AreaType,
+				Status:    row.AreaStatus,
+				AreaM2:    row.AreaM2,
+				CenterLat: row.CenterLat,
+				CenterLng: row.CenterLng,
+				Polygon:   row.Polygon,
+				UpdatedAt: row.AreaUpdatedAt.Time,
+			},
+		})
+	}
+	return reports, nil
 }
