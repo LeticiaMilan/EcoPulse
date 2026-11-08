@@ -2,7 +2,7 @@ import * as SecureStore from 'expo-secure-store';
 import { URLS } from './config';
 
 const TOKEN_KEY = 'ecopulse.token';
-export type User = { id: number; username: string };
+export type User = { id: string; username: string };
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     let res: Response;
