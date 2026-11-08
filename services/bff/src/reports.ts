@@ -9,11 +9,12 @@ const SEVERITIES = ['LOW', 'MEDIUM', 'HIGH'];
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const NEEDED = 5;
 const REPORT_URL = process.env.REPORT_SERVICE_URL ?? '';
+const VALIDATION_URL = process.env.VALIDATION_SERVICE_URL ?? '';  
 
 // respostas já dadas
 const seen = new Map<string, unknown>();
 
-// cópia local dos relatos 
+// cópia local dos relatos
 type StoredReport = {
     id: string; type: string; status: string; severity: string; description: string;
     address: string; latitude: number; longitude: number; user_id: string; username: string;
@@ -51,10 +52,6 @@ reports.post('/reports', requireAuth, async (req, res) => {
             user_id: user.id, area: b.address ?? '', datetime,
             description: b.description, severity: b.severity,
         });
-        await publish('EVENTS.VALIDATION.CREATE', {
-            id: b.id, usuario_id: user.id, tipo: b.type, descricao: b.description,
-            latitude: b.latitude, longitude: b.longitude,
-        });
     } catch {
         return fail(res, 503, 'BROKER_UNAVAILABLE', 'Serviço temporariamente indisponível');
     }
@@ -78,27 +75,41 @@ reports.post('/reports/:id/vote', requireAuth, async (req, res) => {
     const id = String(req.params.id);
     if (!UUID.test(id)) return fail(res, 400, 'INVALID_ID', 'id deve ser UUID');
     if (typeof req.body?.positive !== 'boolean') return fail(res, 400, 'INVALID_VOTE', 'positive deve ser true ou false');
+    const positive = req.body.positive as boolean;
 
-    const key = `vote:${id}:${user.id}`;
-    if (seen.has(key)) return fail(res, 409, 'ALREADY_VOTED', 'Você já votou neste relato');
+    if (VALIDATION_URL) {
+        try {
+            const check = await fetch(`${VALIDATION_URL}/validacaorelatos/votou/${user.id}/${id}`, { signal: AbortSignal.timeout(3000) });
+            if (check.ok && (await check.json()).votou) return fail(res, 409, 'ALREADY_VOTED', 'Você já votou neste relato');
 
-    try {
-        await publish('EVENTS.VALIDATION.VOTE', { id, tipo: req.body.positive ? 'positivo' : 'negativo', usuario_id: user.id });
-    } catch {
-        return fail(res, 503, 'BROKER_UNAVAILABLE', 'Serviço temporariamente indisponível');
+            const r = await fetch(`${VALIDATION_URL}/validacaorelatos/votar/${id}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ positivo: positive, usuario_id: user.id }),
+                signal: AbortSignal.timeout(3000),
+            });
+            if (r.status === 404) return fail(res, 404, 'NOT_FOUND', 'Relato não encontrado');
+            if (!r.ok) {
+                const msg = await r.text();
+                if (/vot/i.test(msg)) return fail(res, 409, 'ALREADY_VOTED', 'Você já votou neste relato');
+                return fail(res, 502, 'VALIDATION_ERROR', msg || 'Erro no serviço de validação');
+            }
+        } catch {
+            return fail(res, 503, 'VALIDATION_UNAVAILABLE', 'Serviço de validação indisponível');
+        }
+    } else {
+        if (myVotes.has(`${id}:${user.id}`)) return fail(res, 409, 'ALREADY_VOTED', 'Você já votou neste relato');
     }
 
-    myVotes.set(`${id}:${user.id}`, req.body.positive);
-    const r = store.get(id);
-    if (r) {
-        if (req.body.positive) r.votes.positive++; else r.votes.negative++;
-        if (r.status === 'POSSIVEL_RELATO' && r.votes.positive >= NEEDED) r.status = 'RELATO_VALIDADO';
-        r.updated_at = new Date().toISOString();
+    myVotes.set(`${id}:${user.id}`, positive);
+    const local = store.get(id);
+    if (local) {
+        if (positive) local.votes.positive++; else local.votes.negative++;
+        if (local.status === 'POSSIVEL_RELATO' && local.votes.positive >= NEEDED) local.status = 'RELATO_VALIDADO';
+        local.updated_at = new Date().toISOString();
     }
 
-    const out = { report_id: id, positive: req.body.positive, accepted_at: new Date().toISOString() };
-    seen.set(key, out);
-    res.status(202).json(out);
+    res.status(202).json({ report_id: id, positive, accepted_at: new Date().toISOString() });
 });
 
 // ---------- GET /reports ----------
