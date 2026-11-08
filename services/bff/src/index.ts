@@ -1,3 +1,4 @@
+import './env';
 import express from 'express';
 import { requireAuth } from './auth';
 import { connectRabbit } from './rabbit';
