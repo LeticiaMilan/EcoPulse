@@ -4,8 +4,9 @@ import (
 	"database/sql"
 	"encoding/json"
 	"net/http"
-	"strconv"
 	"strings"
+
+	"github.com/google/uuid"
 
 	"github.com/LeticiaMilan/ecopulse-login-mod/events"
 	"github.com/LeticiaMilan/ecopulse-login-mod/models"
@@ -22,15 +23,15 @@ func NewUserHandler(db *sql.DB) *UserHandler {
 }
 
 // Extrai e valida o ID da URL
-func getUserID(r *http.Request) (int, error) {
+func getUserID(r *http.Request) (string, error) {
 	idStr := strings.TrimPrefix(r.URL.Path, "/users/")
 
-	id, err := strconv.Atoi(idStr)
-	if err != nil || id <= 0 {
-		return 0, err
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		return "", err
 	}
 
-	return id, nil
+	return id.String(), nil
 }
 
 // GET /users
