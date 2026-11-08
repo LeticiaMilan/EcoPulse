@@ -5,6 +5,7 @@ import { initialModQueue, initialReports, NEED_VOTES, Report, Severity } from '.
 import { enqueue, flushOutbox, pendingIds } from '../services/outbox';
 import { sendEvent } from '../services/api';
 import * as auth from '../services/auth';
+import * as Crypto from 'expo-crypto';
 
 export type Filters = { types: Record<HazardType, boolean>; statuses: Record<Status, boolean>; radiusKm: number; period: '24h' | '7d' | '30d' };
 const allTypes = { alag: true, temp: true, inc: true, desl: true };
@@ -79,7 +80,7 @@ function useAppState() {
   };
 
   const submitReport = (data: { type: HazardType; severity: Severity; description: string; lat: number; lng: number; addr: string }) => {
-    const id = 'r' + Date.now().toString(36);
+    const id = Crypto.randomUUID();
     const rep: Report = {
       id, type: data.type, title: data.description.trim() || 'Ocorrência relatada', addr: data.addr, dist: '0 m', ago: 'agora',
       by: user?.username ?? 'Visitante',
