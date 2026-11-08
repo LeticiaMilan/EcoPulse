@@ -115,8 +115,9 @@ func (c *InboxConsumer) StartConsuming(ctx context.Context) error {
 
 				case "EVENTS.VALIDATION.VOTE":
 					var req struct {
-						ID   string `json:"id"`
-						Tipo string `json:"tipo"`
+						ID        string `json:"id"`
+						Tipo      string `json:"tipo"`
+						UsuarioID string `json:"usuario_id"`
 					}
 					if err := json.Unmarshal(payload, &req); err != nil {
 						return fmt.Errorf("erro ao decodificar JSON de voto: %w", err)
@@ -127,7 +128,16 @@ func (c *InboxConsumer) StartConsuming(ctx context.Context) error {
 						positivo = true
 					}
 
-					err := c.svc.VotarRelato(ctx, req.ID, positivo)
+					existe, err := c.svc.BuscarVoto(ctx, req.UsuarioID, req.ID)
+					if err != nil {
+						return fmt.Errorf("erro ao buscar voto: %w", err)
+					}
+
+					if existe {
+						return fmt.Errorf("voto já registrado para este usuário e relato")
+					}
+
+					err = c.svc.VotarRelato(ctx, req.ID, req.UsuarioID, positivo)
 					if err != nil {
 						return err
 					}

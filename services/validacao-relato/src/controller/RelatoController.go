@@ -16,14 +16,15 @@ func NewRelatoController(r *gin.Engine, svc *service.RelatoService) {
 	controller := &RelatoController{svc: svc}
 
 	// Agrupamento de rotas
-	api := r.Group("/relatos")
+	api := r.Group("/validacaorelatos")
 	{
 		api.POST("", controller.CriarRelato)
 		api.GET("", controller.ListarRelatos)
 		api.GET("/:id", controller.BuscarPorID)
+		api.GET("/votou/:user_id/:relato_id", controller.BuscarVoto)
 		api.PUT("/:id", controller.AtualizarRelato)
 		api.DELETE("/:id", controller.DeletarRelato)
-		api.POST("/:id/votar", controller.VotarRelato)
+		api.POST("/votar/:id", controller.VotarRelato)
 		api.PATCH("/:id/estado", controller.AlterarEstado)
 	}
 }
@@ -39,7 +40,8 @@ type CriarRelatoRequest struct {
 }
 
 type VotarRequest struct {
-	Positivo bool `json:"positivo"`
+	Positivo  bool   `json:"positivo"`
+	UsuarioID string `json:"usuario_id"`
 }
 
 type AlterarEstadoRequest struct {
@@ -111,6 +113,18 @@ func (h *RelatoController) DeletarRelato(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Relato deletado com sucesso"})
 }
 
+func (h *RelatoController) BuscarVoto(c *gin.Context) {
+	userID := c.Param("user_id")
+	relatoID := c.Param("relato_id")
+	existe, err := h.svc.BuscarVoto(c.Request.Context(), userID, relatoID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"votou": existe})
+}
+
 func (h *RelatoController) VotarRelato(c *gin.Context) {
 	id := c.Param("id")
 	var req VotarRequest
@@ -119,7 +133,18 @@ func (h *RelatoController) VotarRelato(c *gin.Context) {
 		return
 	}
 
-	err := h.svc.VotarRelato(c.Request.Context(), id, req.Positivo)
+	votoExiste, err := h.svc.BuscarVoto(c.Request.Context(), req.UsuarioID, id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	if votoExiste {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Voto já registrado para este usuário e relato"})
+		return
+	}
+
+	err = h.svc.VotarRelato(c.Request.Context(), id, req.UsuarioID, req.Positivo)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
