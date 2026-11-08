@@ -14,8 +14,8 @@ type contextKey string
 const userIDKey contextKey = "userID"
 
 // Recupera o ID do usuário autenticado no contexto da requisição
-func UserIDFromContext(ctx context.Context) (int, bool) {
-	userID, ok := ctx.Value(userIDKey).(int)
+func UserIDFromContext(ctx context.Context) (string, bool) {
+	userID, ok := ctx.Value(userIDKey).(string)
 	return userID, ok
 }
 
@@ -57,7 +57,7 @@ func AuthMiddleware(secret []byte) func(http.Handler) http.Handler {
 				return
 			}
 
-			if claims.UserID <= 0 {
+			if claims.UserID == "" {
 				http.Error(w, "Token inválido", http.StatusUnauthorized)
 				return
 			}

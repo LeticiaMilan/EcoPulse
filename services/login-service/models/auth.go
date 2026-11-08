@@ -17,7 +17,7 @@ type LoginResponse struct {
 
 // Informações armazenadas dentro do JWT
 type AuthClaims struct {
-	UserID   int    `json:"user_id"`
+	UserID   string    `json:"user_id"`
 	Username string `json:"username"`
 	jwt.RegisteredClaims
 }
