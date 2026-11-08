@@ -19,6 +19,17 @@ CREATE TABLE IF NOT EXISTS inbox(
     processed_at timestamptz
 );
 
+CREATE TABLE IF NOT EXISTS affected_areas (
+  id UUID PRIMARY KEY,
+  type VARCHAR(50) NOT NULL,
+  status VARCHAR(30) NOT NULL,
+  area_m2 DOUBLE PRECISION NOT NULL,
+  center_lat DOUBLE PRECISION NOT NULL,
+  center_lng DOUBLE PRECISION NOT NULL,
+  polygon JSONB NOT NULL,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS report(
     id           UUID        PRIMARY KEY,
     latitude     FLOAT,
@@ -28,15 +39,4 @@ CREATE TABLE IF NOT EXISTS report(
     area UUID NULL REFERENCES affected_areas(id) ON DELETE SET NULL,
     user_id      UUID       NOT NULL,
     datetime     timestamptz
-);
-
-CREATE TABLE IF NOT EXISTS affected_areas (
-    id UUID PRIMARY KEY,
-    type VARCHAR(50) NOT NULL,
-    status VARCHAR(30) NOT NULL,
-    area_m2 DOUBLE PRECISION NOT NULL,
-    center_lat DOUBLE PRECISION NOT NULL,
-    center_lng DOUBLE PRECISION NOT NULL,
-    polygon JSONB NOT NULL,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
