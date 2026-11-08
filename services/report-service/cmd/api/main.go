@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	_ "embed"
 	"log"
 	"net/http"
 	http2 "report-service/internal/infraestructure/http"
@@ -29,14 +30,23 @@ func main() {
 	defer pool.Close()
 	log.Println("Database connection established")
 
+	// Escutar interrupções do S.O
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	schema, err := os.ReadFile("internal/infraestructure/persistence/postgres/schema.sql")
+	_, err = pool.Exec(ctx, string(schema))
+
+	log.Printf("%s", string(schema))
+
+	if err != nil {
+		// IMPORTANTE: Isso vai te mostrar exatamente qual linha do DDL falhou!
+		log.Fatalf("Erro CRÍTICO ao aplicar o schema SQL: %v", err)
+	}
 	InboxRepository := repository.NewInboxRepository(pool)
 	OutboxRepository := repository.NewOutboxRepository(pool)
 	ReportRepository := repository.NewReportRepository(pool)
 	AreaRepository := repository.NewAreaRepository(pool)
-
-	// Escutar interrupções do S.O
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
 
 	dispatcherChan := make(chan worker.EventEnvelope, 100)
 	ConsumerChannel := StartRabbit(ctx, InboxRepository, OutboxRepository, dispatcherChan)

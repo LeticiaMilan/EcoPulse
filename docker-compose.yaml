@@ -1,0 +1,200 @@
+services:
+
+  # RabbitMQ
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: ecopulse-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: ecopulse
+      RABBITMQ_DEFAULT_PASS: ecopulse_dev
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: [ "CMD", "rabbitmq-diagnostics", "-q", "ping" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    networks:
+      - login-network
+      - report-network
+      - area-network
+      - validacao-network
+
+  # Banco de dados login
+  login-postgres:
+    image: postgres:17-alpine
+    container_name: ecopulse-postgres-login
+    environment:
+      POSTGRES_DB: ecopulse_auth
+      POSTGRES_USER: ecopulse
+      POSTGRES_PASSWORD: ecopulse_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data_login:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ecopulse -d ecopulse_auth"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    networks:
+      - login-network
+
+  # Microsserviço de Login
+  login-service:
+    build:
+      context: ./services/login-service
+      dockerfile: Dockerfile
+    container_name: ecopulse-login
+    ports:
+      - "81:8080"
+    environment:
+      JWT_SECRET: "ecopulse-segredo-local-123456789012345"
+
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USERNAME: ecopulse
+      DB_PASSWORD: ecopulse_dev
+      DB_NAME: ecopulse_auth
+
+      RABBITMQ_URL: "amqp://ecopulse:ecopulse_dev@rabbitmq:5672/"
+    depends_on:
+      login-postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - login-network
+
+
+  # Banco de dados Report
+  report-postgres:
+    image: postgres:17-alpine
+    container_name: ecopulse-postgres-report
+    environment:
+      POSTGRES_DB: banco
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data_report:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    networks:
+      - report-network
+
+  # Microsserviço de Report
+  report-service:
+    build:
+      context: ./services/report-service
+      dockerfile: Dockerfile
+    container_name: ecopulse-report
+    ports:
+      - "82:8080"
+    environment:
+
+
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: banco
+      POSTGRES_URL: "postgres://postgres:postgres@report-postgres:5432/banco?sslmode=disable"
+      AMQP_URL: "amqp://ecopulse:ecopulse_dev@rabbitmq:5672/"
+    depends_on:
+      report-postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - report-network
+
+
+  # Banco de dados Area Agetada
+  postgres-area:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ecopulse
+      POSTGRES_PASSWORD: ecopulse
+      POSTGRES_DB: calculate_area
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres_data_area:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ecopulse -d calculate_area"]
+      interval: 5s
+      retries: 10
+    networks:
+      - area-network
+
+  # Microsserviço de Area Afetada
+  calculate-area-service:
+    build: ./services/calculate-area-afetada-service/
+    environment:
+      DATABASE_URL: postgresql://ecopulse:ecopulse@postgres-area:5432/calculate_area
+      RABBITMQ_URL: amqp://ecopulse:ecopulse_dev@rabbitmq:5672/
+    depends_on:
+      postgres-area:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: on-failure
+    networks:
+      - area-network
+
+  postgres-validacao:
+    image: postgres:16-alpine
+    container_name: postgres_db
+    restart: always
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=dbadmin
+      - POSTGRES_DB=aps_validacao
+    ports:
+      - "5435:5432"
+    volumes:
+      - postgres_data_validacao:/var/lib/postgresql/data
+      - ./init-db:/docker-entrypoint-initdb.d
+    networks:
+      - validacao-network
+
+  # Microsserviço de Validacao
+  validacao-service:
+    build: ./services/validacao-relato
+    container_name: validacao_relato_app
+    restart: always
+    ports:
+      - "83:8080"
+    environment:
+      - DB_URL=postgres://postgres:dbadmin@postgres-validacao:5432/aps_validacao?sslmode=disable
+      - RABBITMQ_URL=amqp://ecopulse:ecopulse_dev@rabbitmq:5672/
+    depends_on:
+      - postgres-validacao
+      - rabbitmq
+    networks:
+      - validacao-network
+
+volumes:
+  postgres_data_login:
+  postgres_data_report:
+  postgres_data_area:
+  postgres_data_validacao:
+  rabbitmq_data:
+networks:
+  login-network:
+  report-network:
+  area-network:
+  validacao-network:
