@@ -20,6 +20,8 @@ type RelatoRepository interface {
 	AdicionarVoto(ctx context.Context, tx *sql.Tx, relatoID string, positivo bool, eventType string, eventPayload interface{}) error
 	ProcessarAvaliacoesPeriodicas(ctx context.Context) error
 	BuscarPorIDComOutbox(ctx context.Context, id string, eventType string) (*model.Relato, error)
+	BuscarVoto(ctx context.Context, user_id string, relato_id string) (bool, error)
+	InserirVoto(ctx context.Context, relato_id string, usuario_id string) error
 }
 
 type PostgresRelatoRepository struct {
@@ -134,6 +136,35 @@ func (r *PostgresRelatoRepository) BuscarPorID(ctx context.Context, id string) (
 	}
 
 	return &relato, nil
+}
+
+func (r *PostgresRelatoRepository) BuscarVoto(ctx context.Context, user_id string, relato_id string) (bool, error) {
+	query := `
+		SELECT EXISTS (
+			SELECT 1 FROM votos WHERE usuario_id = $1 AND relato_id = $2
+		)`
+
+	var exists bool
+
+	err := r.db.QueryRowContext(ctx, query, user_id, relato_id).Scan(&exists)
+	if err != nil {
+		return false, fmt.Errorf("erro ao buscar voto: %w", err)
+	}
+
+	return exists, nil
+}
+
+func (r *PostgresRelatoRepository) InserirVoto(ctx context.Context, relato_id string, usuario_id string) error {
+	query := `
+		INSERT INTO votos (relato_id, usuario_id)
+		VALUES ($1, $2)`
+
+	_, err := r.db.ExecContext(ctx, query, relato_id, usuario_id)
+	if err != nil {
+		return fmt.Errorf("erro ao inserir voto: %w", err)
+	}
+
+	return nil
 }
 
 func (r *PostgresRelatoRepository) BuscarPorIDComOutbox(ctx context.Context, id string, eventType string) (*model.Relato, error) {

@@ -4,20 +4,23 @@ import (
 	"context"
 	"log"
 	"os"
+	"validacao-relato/src/controller"
 	"validacao-relato/src/database"
 	"validacao-relato/src/repository"
 	"validacao-relato/src/service"
 	queue "validacao-relato/src/worker"
 
+	"github.com/gin-gonic/gin"
 	_ "github.com/lib/pq"
 )
 
 func main() {
+
 	ctx := context.Background()
 
 	// Conexão com o PostgreSQL usando a nova função centralizada
 	dsn := os.Getenv("DB_URL")
-	//dsn := "postgres://postgres:dbadmin@postgres-validacao:5432/aps_validacao?sslmode=disable"
+	// dsn := "postgres://postgres:dbadmin@localhost:5432/aps_validacao?sslmode=disable"
 	db, err := database.NewPostgresConnection(dsn)
 	if err != nil {
 		log.Fatalf("Falha crítica ao iniciar banco de dados: %v", err)
@@ -26,7 +29,7 @@ func main() {
 
 	// Conexão e Configuração do RabbitMQ
 	rabbitConn, err := queue.NewRabbitMQConn(os.Getenv("RABBITMQ_URL"))
-	//rabbitConn, err := queue.NewRabbitMQConn("amqp://guest:guest@localhost:5672/")
+	// rabbitConn, err := queue.NewRabbitMQConn("amqp://guest:guest@localhost:5672/")
 	if err != nil {
 		log.Fatalf("Erro ao conectar no RabbitMQ: %v", err)
 	}
@@ -48,8 +51,14 @@ func main() {
 	avaliacaoWorker := queue.NewAvaliacaoWorker(repo)
 	go avaliacaoWorker.Start(ctx)
 
-	log.Println("Microsserviço iniciado com sucesso! Todos os workers estão em execução.")
+	log.Println(" Todos os workers estão em execução.")
 
-	// Mantém a aplicação rodando em background
-	select {}
+	r := gin.Default()
+
+	controller.NewRelatoController(r, svc)
+
+	if err := r.Run(":8080"); err != nil {
+		log.Fatalf("Erro ao iniciar o servidor HTTP: %v", err)
+	}
+
 }

@@ -1,7 +1,7 @@
 package models
 
 type User struct {
-	ID           int    `json:"id"`
+	ID           string `json:"id"`
 	Username     string `json:"username"`
 	PasswordHash string `json:"-"` //o hash da senha não será exposto na resposta JSON
 }
@@ -17,7 +17,7 @@ type UpdateUserRequest struct {
 }
 
 type UserResponse struct {
-	ID       int    `json:"id"`
+	ID       string `json:"id"`
 	Username string `json:"username"`
 }
 
@@ -26,7 +26,7 @@ const (
 	TableName      = "users"
 	CreateTableSQL = `
 	CREATE TABLE IF NOT EXISTS users (
-		id SERIAL PRIMARY KEY,
+		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 		username VARCHAR(255) UNIQUE NOT NULL,
 		password VARCHAR(255) NOT NULL
 	)
