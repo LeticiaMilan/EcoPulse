@@ -4,6 +4,7 @@ import { HazardType, Status } from '../theme';
 import { initialModQueue, initialReports, NEED_VOTES, Report, Severity } from '../data/mock';
 import { enqueue, flushOutbox, pendingIds } from '../services/outbox';
 import { sendEvent } from '../services/api';
+import * as auth from '../services/auth';
 
 export type Filters = { types: Record<HazardType, boolean>; statuses: Record<Status, boolean>; radiusKm: number; period: '24h' | '7d' | '30d' };
 const allTypes = { alag: true, temp: true, inc: true, desl: true };
@@ -15,7 +16,11 @@ function useAppState() {
   const [simOffline, setSimOffline] = useState(false);
   const offline = simOffline || net.isConnected === false;
 
-  const [authed, setAuthed] = useState(false);
+  // Usuário real vindo do login-service
+  const [user, setUser] = useState<auth.User | null>(null);
+  const authed = !!user;
+  useEffect(() => { auth.restoreSession().then(setUser); }, []);
+
   const [reports, setReports] = useState<Report[]>(initialReports);
   const [selectedId, setSelectedId] = useState('r1');
   const [myVotes, setMyVotes] = useState<Record<string, 'yes' | 'no'>>({});
@@ -76,7 +81,8 @@ function useAppState() {
   const submitReport = (data: { type: HazardType; severity: Severity; description: string; lat: number; lng: number; addr: string }) => {
     const id = 'r' + Date.now().toString(36);
     const rep: Report = {
-      id, type: data.type, title: data.description.trim() || 'Ocorrência relatada', addr: data.addr, dist: '0 m', ago: 'agora', by: 'Ana S.',
+      id, type: data.type, title: data.description.trim() || 'Ocorrência relatada', addr: data.addr, dist: '0 m', ago: 'agora',
+      by: user?.username ?? 'Visitante',
       status: 'pend', votes: 0, lat: data.lat, lng: data.lng, radius: 110, mine: true, sync: offline ? 'pending' : 'ok', severity: data.severity,
     };
     setReports(rs => [rep, ...rs]);
@@ -89,7 +95,10 @@ function useAppState() {
 
   return {
     offline, simOffline, setSimOffline, syncing, lastSync, runSync, pendingCount,
-    authed, login: () => setAuthed(true), logout: () => setAuthed(false),
+    authed, user,
+    login: async (u: string, p: string) => setUser(await auth.login(u, p)),
+    register: async (u: string, p: string) => setUser(await auth.register(u, p)),
+    logout: () => { auth.logout(); setUser(null); },
     reports, visibleReports, selected, selectedId, setSelectedId, myVotes, vote, submitReport,
     layers, toggleLayer: (k: keyof typeof layers) => setLayers(l => ({ ...l, [k]: !l[k] })),
     filters, setFilters, filtersActive, clearFilters: () => setFilters({ ...defaultFilters, statuses: { pend: true, val: true, fin: true } }),

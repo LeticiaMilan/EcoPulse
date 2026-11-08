@@ -6,7 +6,6 @@ import { c, f, t, hazard, shadow } from '../theme';
 import { useApp } from '../store/AppContext';
 import { Button, Icon, Toggle } from '../components/ui';
 import type { RootNav } from '../navigation/types';
-import { CURRENT_USER } from '../data/mock';
 
 export default function ProfileScreen() {
   const nav = useNavigation<RootNav>();
@@ -18,11 +17,11 @@ export default function ProfileScreen() {
       <ScrollView contentContainerStyle={{ padding: 16, paddingTop: 12, gap: 16 }}>
         <View style={{ flexDirection: 'row', gap: 14, alignItems: 'center', padding: 4, paddingVertical: 8 }}>
           <View style={{ width: 60, height: 60, borderRadius: 22, backgroundColor: c.container, alignItems: 'center', justifyContent: 'center' }}>
-            <Text style={{ fontFamily: f.extrabold, fontSize: 22, color: c.onContainer }}>{app.authed ? CURRENT_USER.initials : '?'}</Text>
+            <Text style={{ fontFamily: f.extrabold, fontSize: 22, color: c.onContainer }}>{app.user ? app.user.username.slice(0, 2).toUpperCase() : '?'}</Text>
           </View>
           <View style={{ gap: 4 }}>
-            <Text style={t.titleSm}>{app.authed ? CURRENT_USER.name : 'Visitante'}</Text>
-<Text style={[t.caption, { fontFamily: f.medium, fontSize: 13, color: c.ink2 }]}>{app.authed ? `${CURRENT_USER.role} · ${CURRENT_USER.city}` : 'Só consulta do mapa'}</Text>
+            <Text style={t.titleSm}>{app.user ? app.user.username : 'Visitante'}</Text>
+            <Text style={[t.caption, { fontFamily: f.medium, fontSize: 13, color: c.ink2 }]}>{app.user ? `ID ${app.user.id} · Ribeirão Preto, SP` : 'Só consulta do mapa'}</Text>
           </View>
         </View>
 
