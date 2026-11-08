@@ -70,7 +70,7 @@ type VotoEvent struct {
 	Positivo bool   `json:"positivo"`
 }
 
-func (s *RelatoService) VotarRelato(ctx context.Context, relatoID string, positivo bool) error {
+func (s *RelatoService) VotarRelato(ctx context.Context, relatoID string, usuarioID string, positivo bool) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -93,7 +93,18 @@ func (s *RelatoService) VotarRelato(ctx context.Context, relatoID string, positi
 		return err
 	}
 
+	s.repo.InserirVoto(ctx, relatoID, usuarioID)
+
 	return tx.Commit()
+}
+
+func (s *RelatoService) BuscarVoto(ctx context.Context, usuarioID, relatoID string) (bool, error) {
+	existe, err := s.repo.BuscarVoto(ctx, usuarioID, relatoID)
+	if err != nil {
+		return false, fmt.Errorf("erro ao verificar voto existente: %w", err)
+	}
+
+	return existe, nil
 }
 
 func (s *RelatoService) BuscarPorID(ctx context.Context, id string) (*model.Relato, error) {

@@ -1,7 +1,7 @@
 package models
 
 type User struct {
-	ID           int    `json:"id"`
+	ID           string `json:"id"`
 	Username     string `json:"username"`
 	PasswordHash string `json:"-"` //o hash da senha não será exposto na resposta JSON
 }
@@ -17,7 +17,7 @@ type UpdateUserRequest struct {
 }
 
 type UserResponse struct {
-	ID       int    `json:"id"`
+	ID       string `json:"id"`
 	Username string `json:"username"`
 }
 

@@ -24,6 +24,66 @@ A tabela relato no banco de dados local apresenta a seguinte estrutura:
 ### Docker
 
 
+## Rotas HTTP
+
+Raiz /validacaorelatos
+
+Rotas:
+
+- Enviar uma cópia do relato:
+    - POST /
+    - Esta rota não precisa ser utilizada, uma vez que este microsserviço já recebe o evento EVENTS.REPORT.CREATED do microsserviço de relatos.
+    - Esta rota espera receber o json:
+        ```
+        {
+            "id": "relato_uuid",
+            "usuario_id": "usuario_uuid",
+            "tipo": "tipo",
+            "descricao": "descricao",
+            "latitude": 0.0,
+            "longitude": 0.0
+        }
+        ```
+
+- Buscar relato por id:
+    - GET /:id
+    - Exemplo de resposta em caso sucesso:
+        ```
+        {
+            "id": "661211f1-921e-4100-9280-de1578f4dc50",
+            "usuario_id": "661211f1-921e-4100-9280-de1578f4dc10",
+            "tipo": "teste",
+            "descricao": "descricao",
+            "latitude": -15,
+            "longitude": 30,
+            "votos_positivos": 0,
+            "votos_negativos": 0,
+            "estado": "RELATO_VALIDADO",
+            "criado_em": "2026-11-08T18:57:11.408232-03:00",
+            "proxima_avaliacao_em": "2026-11-08T20:12:20.089912-03:00",
+            "atualizado_em": "2026-11-08T19:12:20.089912-03:00"
+        }
+        ```
+
+- Testar se usuário votou: 
+    - GET /votou/:usuario_id/:relato_id
+    - Exemplo de resposta:
+        ```
+        {
+            "votou": true
+        }
+        ```
+
+- Votar no relato:
+    - POST /votar/:relato_id
+    - Esta rota espera receber o json:
+        ```
+        {
+            "positivo": true ou false
+            "usuario_id": "usuario_uuid"
+        }
+        ```
+
 ## Eventos
 
 A exchange do RabbitMQ onde este microsserviço opera é validacao_relatos_exchange
