@@ -65,6 +65,10 @@ func (s *RelatoService) CriarRelato(ctx context.Context, ID, usuarioID, tipo, de
 	return relato, nil
 }
 
+// ConfirmacoesParaValidar: com esse número de confirmações (e mais confirmações do que negações)
+// o relato é validado na hora. O app mostra a mesma meta ("3/5 confirmam").
+const ConfirmacoesParaValidar = 5
+
 type VotoEvent struct {
 	ID       string `json:"id"`
 	Positivo bool   `json:"positivo"`
@@ -91,6 +95,14 @@ func (s *RelatoService) VotarRelato(ctx context.Context, relatoID string, usuari
 	err = s.repo.AdicionarVoto(ctx, tx, relatoID, positivo, "EVENTS.VALIDATIONRESPONSE.VOTED", eventPayload)
 	if err != nil {
 		return err
+	}
+
+	// Com ConfirmacoesParaValidar confirmações o relato é validado na hora,
+	// sem esperar a avaliação periódica de 15 minutos.
+	if positivo {
+		if _, err := s.repo.ValidarSeAtingiuMeta(ctx, tx, relatoID, ConfirmacoesParaValidar); err != nil {
+			return err
+		}
 	}
 
 	s.repo.InserirVoto(ctx, relatoID, usuarioID)

@@ -3,8 +3,7 @@ import { FlatList, Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { c, f, t, hazard, shadow } from '../theme';
-import { useApp } from '../store/AppContext';
-import { NEED_VOTES } from '../data/mock';
+import { useApp, voteCaption } from '../store/AppContext';
 import { HazardIcon, Icon, IconButton, StatusChip } from '../components/ui';
 import type { RootNav } from '../navigation/types';
 
@@ -41,13 +40,13 @@ export default function ListScreen() {
             <HazardIcon type={r.type} />
             <View style={{ flex: 1, gap: 5 }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8 }}>
-                <Text style={[t.overline, { fontSize: 12, flexShrink: 1 }]} numberOfLines={1}>{hazard[r.type].name} · {r.dist}</Text>
+                <Text style={[t.overline, { fontSize: 12, flexShrink: 1 }]} numberOfLines={1}>{hazard[r.type].name}{r.dist ? ` · ${r.dist}` : ''}</Text>
                 <Text style={[t.caption, { fontFamily: f.medium }]}>{r.ago}</Text>
               </View>
               <Text style={[t.bodyStrong, { fontSize: 15, lineHeight: 20 }]}>{r.title}</Text>
               <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                 <StatusChip status={r.status} />
-                <Text style={[t.caption, { fontFamily: f.medium }]}>{r.status === 'fin' ? 'encerrado' : `${r.votes}/${NEED_VOTES} votos`}</Text>
+                <Text style={[t.caption, { fontFamily: f.medium }]}>{voteCaption(r)}</Text>
                 {r.sync === 'pending' && (
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
                     <Icon name="cloud-upload" size={15} color={c.offFg} />

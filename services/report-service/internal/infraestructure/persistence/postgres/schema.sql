@@ -30,6 +30,11 @@ CREATE TABLE IF NOT EXISTS affected_areas (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Votos "a situação ainda está acontecendo?" (vindos do calculate-area-service)
+ALTER TABLE affected_areas ADD COLUMN IF NOT EXISTS votes_still_happening INT NOT NULL DEFAULT 0;
+ALTER TABLE affected_areas ADD COLUMN IF NOT EXISTS votes_resolved INT NOT NULL DEFAULT 0;
+ALTER TABLE affected_areas ADD COLUMN IF NOT EXISTS votes_needed INT NOT NULL DEFAULT 0;
+
 CREATE TABLE IF NOT EXISTS report(
     id           UUID        PRIMARY KEY,
     latitude     FLOAT,

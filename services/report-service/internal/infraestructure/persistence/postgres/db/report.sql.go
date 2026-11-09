@@ -13,7 +13,7 @@ import (
 )
 
 const createReport = `-- name: CreateReport :one
-INSERT INTO report (id, latitude, longitude, type, status, user_id, datetime, area) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, latitude, longitude, type, status, area, user_id, datetime
+INSERT INTO report (id, latitude, longitude, type, status, user_id, datetime, area) VALUES ($1, $2, $3, $4, $5, $6, $7, NULLIF($8::uuid, '00000000-0000-0000-0000-000000000000'::uuid)) RETURNING id, latitude, longitude, type, status, area, user_id, datetime
 `
 
 type CreateReportParams struct {
@@ -93,7 +93,10 @@ SELECT
     a.center_lat,
     a.center_lng,
     a.polygon,
-    a.updated_at AS area_updated_at
+    a.updated_at AS area_updated_at,
+    a.votes_still_happening,
+    a.votes_resolved,
+    a.votes_needed
 FROM report r
          INNER JOIN affected_areas a ON a.id = r.area
 WHERE r.datetime >= $1
@@ -107,21 +110,24 @@ type GetReportsWithAreaParams struct {
 }
 
 type GetReportsWithAreaRow struct {
-	ReportID      uuid.UUID
-	Latitude      pgtype.Float8
-	Longitude     pgtype.Float8
-	ReportType    pgtype.Text
-	ReportStatus  pgtype.Text
-	UserID        uuid.UUID
-	Datetime      pgtype.Timestamptz
-	AreaID        uuid.UUID
-	AreaType      string
-	AreaStatus    string
-	AreaM2        float64
-	CenterLat     float64
-	CenterLng     float64
-	Polygon       []byte
-	AreaUpdatedAt pgtype.Timestamptz
+	ReportID            uuid.UUID
+	Latitude            pgtype.Float8
+	Longitude           pgtype.Float8
+	ReportType          pgtype.Text
+	ReportStatus        pgtype.Text
+	UserID              uuid.UUID
+	Datetime            pgtype.Timestamptz
+	AreaID              uuid.UUID
+	AreaType            string
+	AreaStatus          string
+	AreaM2              float64
+	CenterLat           float64
+	CenterLng           float64
+	Polygon             []byte
+	AreaUpdatedAt       pgtype.Timestamptz
+	VotesStillHappening int32
+	VotesResolved       int32
+	VotesNeeded         int32
 }
 
 func (q *Queries) GetReportsWithArea(ctx context.Context, arg GetReportsWithAreaParams) ([]GetReportsWithAreaRow, error) {
@@ -149,6 +155,9 @@ func (q *Queries) GetReportsWithArea(ctx context.Context, arg GetReportsWithArea
 			&i.CenterLng,
 			&i.Polygon,
 			&i.AreaUpdatedAt,
+			&i.VotesStillHappening,
+			&i.VotesResolved,
+			&i.VotesNeeded,
 		); err != nil {
 			return nil, err
 		}

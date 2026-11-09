@@ -14,13 +14,29 @@ export type Report = {
   lat: number;
   lng: number;
   radius: number; // metros na zona de influência
-  mine: boolean;
+  userId?: string; // id (UUID) da conta que criou o relato
+  mine: boolean; // calculado no AppContext: userId === conta logada
   sync: 'ok' | 'pending';
   severity: Severity;
+  // Campos vindos do backend
+  datetime?: string; // ISO 8601
+  negative?: number; // votos "não vi isso" (votes = confirmações)
+  rejected?: boolean; // status 'fin' por rejeição na votação (e não por resolução)
+  area?: ReportArea | null; // área afetada à qual o relato pertence
+};
+
+export type ReportArea = {
+  id: string;
+  status: 'candidate' | 'active' | 'resolved' | 'expired';
+  areaM2: number;
+  polygon: { latitude: number; longitude: number }[];
+  votes: { stillHappening: number; resolved: number; needed: number };
 };
 
 export const USER = { lat: -21.1775, lng: -47.8103 };
 export const CURRENT_USER = { name: 'Usuário 1', initials: 'U1', role: 'Moderador(a)', city: 'Ribeirão Preto, SP' };
+// Confirmações para validar um relato na hora. Precisa ser igual a ConfirmacoesParaValidar
+// no validacao-relato (services/validacao-relato/src/service/RelatoService.go).
 export const NEED_VOTES = 5;
 
 export const initialReports: Report[] = [

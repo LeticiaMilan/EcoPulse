@@ -181,6 +181,18 @@ class AffectedArea:
         if no_votes >= self.rules.min_votes_to_resolve and no_votes > yes_votes:
             self.status = AreaStatus.RESOLVED
             self._record(AreaEventType.RESOLVED, now)
+        else:
+            # Avisa a contagem nova para quem mostra a área (report-service -> app)
+            self._record(AreaEventType.UPDATED, now)
+
+    @property
+    def vote_counts(self) -> dict:
+        no_votes = sum(1 for v in self.votes.values() if not v)
+        return {
+            "still_happening": len(self.votes) - no_votes,
+            "resolved": no_votes,
+            "needed": self.rules.min_votes_to_resolve,
+        }
 
     def expire_if_stale(self, now: datetime) -> bool:
         if not self.is_open or now - self.last_activity_at < self.rules.expiration_after:

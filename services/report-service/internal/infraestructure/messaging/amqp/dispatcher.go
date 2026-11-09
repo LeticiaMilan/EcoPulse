@@ -78,10 +78,10 @@ func (d *Dispatcher) Start(ctx context.Context, canal <-chan worker.EventEnvelop
 					msg.Tx.Rollback(ctx)
 					msg.Tx = nil
 					cancel()
-					log.Printf("Error publishing message to outbox channel: %s", err)
+					log.Printf("Error publishing message to outbox channel: %v", errPublish)
 					continue
 				}
-				log.Printf("Published message to outbox channel, %v")
+				log.Printf("Published message %s (%s)", msg.ID, msg.RoutingKey)
 				cancel()
 
 				d.OutboxRepository.MarkAsProcessed(txCtx, msg.ID)

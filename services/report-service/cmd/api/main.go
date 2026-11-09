@@ -59,13 +59,15 @@ func main() {
 
 	reportUseCase := application.NewReportUseCase(ReportRepository, BrasilNtpClock, OutboxRepository)
 	AreaUseCase := application.NewAreaUseCase(AreaRepository, ReportRepository, OutboxRepository)
-	ReportGeneratedHandler := delivery.NewHandler[*domain.Report](application.NewGeneratedReportUseCase(reportUseCase))
-	ReportValidatedHandler := delivery.NewHandler[*domain.Report](application.NewValidatedReport(reportUseCase))
-	ReportDefinedAreaHandler := delivery.NewHandler[*domain.Area](application.NewAreaDefined(AreaUseCase))
+	ReportGeneratedHandler := delivery.NewReportHandler(application.NewGeneratedReportUseCase(reportUseCase))
+	ReportValidatedHandler := delivery.NewReportHandler(application.NewValidatedReport(reportUseCase))
+	ReportDefinedAreaHandler := delivery.NewAreaHandler(application.NewAreaDefined(AreaUseCase))
 	Inboxprocessor := delivery.NewInboxProcessor()
 	Inboxprocessor.RegisterHandler(string(domain.InboxGeneratedReportEvent), ReportGeneratedHandler)
 	Inboxprocessor.RegisterHandler(string(domain.InboxValidatedReportEvent), ReportValidatedHandler)
-	Inboxprocessor.RegisterHandler(string(domain.InboxAreaDefinedReportEvent), ReportDefinedAreaHandler)
+	for _, areaEvent := range domain.InboxAreaEvents {
+		Inboxprocessor.RegisterHandler(string(areaEvent), ReportDefinedAreaHandler)
+	}
 
 	OutboxWorker := worker.NewOutboxWorker(OutboxRepository, dispatcherChan)
 	inboxWorker := worker.NewInboxWorker(InboxRepository, Inboxprocessor, OutboxRepository)
@@ -131,7 +133,9 @@ func StartRabbit(ctx context.Context, inboxRepository ports.InboxRepository, out
 	var RoutingKeys []string
 	RoutingKeys = append(RoutingKeys, string(domain.InboxGeneratedReportEvent))
 	RoutingKeys = append(RoutingKeys, string(domain.InboxValidatedReportEvent))
-	RoutingKeys = append(RoutingKeys, string(domain.InboxAreaDefinedReportEvent))
+	for _, areaEvent := range domain.InboxAreaEvents {
+		RoutingKeys = append(RoutingKeys, string(areaEvent))
+	}
 
 	consumer := amqp.NewConsumer(QueueManager, inboxRepository, "exchange.ecopulse", "topic", "queue.service.report", RoutingKeys)
 	ConsumerChannel, ReceivedMessages, err := consumer.Start()

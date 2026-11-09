@@ -38,3 +38,6 @@ export async function restoreSession() {
 }
 
 export const logout = () => SecureStore.deleteItemAsync(TOKEN_KEY);
+
+// Token da sessão atual, usado nas chamadas ao BFF
+export const getToken = () => SecureStore.getItemAsync(TOKEN_KEY);

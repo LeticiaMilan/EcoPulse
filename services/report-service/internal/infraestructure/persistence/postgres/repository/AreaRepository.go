@@ -32,6 +32,10 @@ func (repo *AreaRepositoryImpl) Save(ctx context.Context, area *domain.Area) err
 		CenterLng: area.Center.Longitude,
 		Polygon:   area.Polygon,
 		UpdatedAt: pgtype.Timestamptz{},
+
+		VotesStillHappening: int32(area.Votes.StillHappening),
+		VotesResolved:       int32(area.Votes.Resolved),
+		VotesNeeded:         int32(area.Votes.Needed),
 	}
 
 	Query := repo.GetExecutor(ctx)

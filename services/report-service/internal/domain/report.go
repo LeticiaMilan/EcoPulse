@@ -26,6 +26,7 @@ type ReportAffectedAreaDTO struct {
 	CenterLng float64         `json:"center_lng"`
 	Polygon   json.RawMessage `json:"polygon"` // Lê o JSONB nativamente
 	UpdatedAt time.Time       `json:"updated_at"`
+	Votes     AreaVotes       `json:"votes"`
 }
 
 // ReportWithArea representa o join e o formato final da resposta HTTP
@@ -78,6 +79,9 @@ type Report struct {
 	UserID    uuid.UUID
 	Area      uuid.UUID
 	Datetime  time.Time
+	// Description não é gravada no banco do report; só é repassada no EVENTS.REPORT.CREATED
+	// para o validacao-relato guardar na cópia de votação.
+	Description string
 }
 
 // Validações futuras

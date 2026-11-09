@@ -24,6 +24,7 @@ const (
 	OutboxReportRejected         OutboxEventType = "EVENTS.REPORT.REJECTED"
 	OutboxReportCreated          OutboxEventType = "EVENTS.REPORT.CREATED"
 	OutboxReportDefinedAreaError OutboxEventType = "EVENTS.REPORT.DEFINED_AREA_ERROR"
+	OutboxReportAreaDefined      OutboxEventType = "EVENTS.REPORT.AREA_DEFINED"
 )
 
 type Outbox struct {

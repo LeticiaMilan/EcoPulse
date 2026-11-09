@@ -18,6 +18,7 @@ type RelatoRepository interface {
 	DeletarComOutbox(ctx context.Context, tx *sql.Tx, id string, eventType string, eventPayload interface{}) error
 	ProcessarInbox(ctx context.Context, msgID, eventType string, payload []byte, handler func() error) error
 	AdicionarVoto(ctx context.Context, tx *sql.Tx, relatoID string, positivo bool, eventType string, eventPayload interface{}) error
+	ValidarSeAtingiuMeta(ctx context.Context, tx *sql.Tx, relatoID string, meta int) (bool, error)
 	ProcessarAvaliacoesPeriodicas(ctx context.Context) error
 	BuscarPorIDComOutbox(ctx context.Context, id string, eventType string) (*model.Relato, error)
 	BuscarVoto(ctx context.Context, user_id string, relato_id string) (bool, error)
@@ -191,6 +192,60 @@ func (r *PostgresRelatoRepository) BuscarPorIDComOutbox(ctx context.Context, id 
 	}
 
 	return relato, nil
+}
+
+// ValidarSeAtingiuMeta valida o relato na hora quando ele chega a `meta` confirmações
+// (e tem mais confirmações do que negações). Segue o mesmo efeito da avaliação periódica:
+// zera os votos, agenda a próxima avaliação para daqui a 1 hora e avisa o report-service
+// (EVENTS.VALIDATIONRESPONSE.REPORT) na mesma transação.
+func (r *PostgresRelatoRepository) ValidarSeAtingiuMeta(ctx context.Context, tx *sql.Tx, relatoID string, meta int) (bool, error) {
+	query := `
+		UPDATE relatos
+		SET estado = 'RELATO_VALIDADO'::estado_relato,
+			votos_positivos = 0,
+			votos_negativos = 0,
+			proxima_avaliacao_em = NOW() + INTERVAL '1 hour',
+			atualizado_em = NOW()
+		WHERE id = $1
+			AND estado = 'POSSIVEL_RELATO'
+			AND votos_positivos >= $2
+			AND votos_positivos > votos_negativos
+		RETURNING id, usuario_id, tipo, descricao, latitude, longitude, votos_positivos, votos_negativos, estado, criado_em, proxima_avaliacao_em, atualizado_em`
+
+	var relato model.Relato
+	err := tx.QueryRowContext(ctx, query, relatoID, meta).Scan(
+		&relato.ID,
+		&relato.UsuarioID,
+		&relato.Tipo,
+		&relato.Descricao,
+		&relato.Latitude,
+		&relato.Longitude,
+		&relato.VotosPositivos,
+		&relato.VotosNegativos,
+		&relato.Estado,
+		&relato.CriadoEm,
+		&relato.ProximaAvaliacaoEm,
+		&relato.AtualizadoEm,
+	)
+	if err == sql.ErrNoRows {
+		return false, nil // ainda não chegou à meta
+	}
+	if err != nil {
+		return false, fmt.Errorf("erro ao validar relato pela meta de confirmações: %w", err)
+	}
+
+	const eventoAvaliacao = "EVENTS.VALIDATIONRESPONSE.REPORT"
+	payload, eventID, err := CriarEnvelopeEvent(eventoAvaliacao, relato)
+	if err != nil {
+		return false, fmt.Errorf("erro ao criar envelope do relato validado: %w", err)
+	}
+	queryOutbox := `
+		INSERT INTO outbox (id, event_type, status, content, created_at, next_attempt)
+		VALUES ($1, $2, 'PENDING', $3, NOW(), NOW())`
+	if _, err := tx.ExecContext(ctx, queryOutbox, eventID, eventoAvaliacao, payload); err != nil {
+		return false, fmt.Errorf("erro ao inserir evento do relato validado na outbox: %w", err)
+	}
+	return true, nil
 }
 
 func (r *PostgresRelatoRepository) AdicionarVoto(ctx context.Context, tx *sql.Tx, relatoID string, positivo bool, eventType string, eventPayload interface{}) error {
@@ -390,11 +445,68 @@ func (r *PostgresRelatoRepository) ProcessarAvaliacoesPeriodicas(ctx context.Con
 				ELSE proxima_avaliacao_em 
 			END,
 			atualizado_em = NOW()
-		WHERE estado = 'POSSIVEL_RELATO' AND proxima_avaliacao_em <= NOW()`
+		WHERE estado = 'POSSIVEL_RELATO' AND proxima_avaliacao_em <= NOW()
+		RETURNING id, usuario_id, tipo, descricao, latitude, longitude, votos_positivos, votos_negativos, estado, criado_em, proxima_avaliacao_em, atualizado_em`
 
-	_, err := r.db.ExecContext(ctx, queryPossivel)
+	// A mudança de estado e o evento avisando o report-service são gravados na mesma
+	// transação (padrão Outbox): ou os dois acontecem, ou nenhum.
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("erro ao iniciar transação da avaliação periódica: %w", err)
+	}
+	defer tx.Rollback()
+
+	rows, err := tx.QueryContext(ctx, queryPossivel)
 	if err != nil {
 		return fmt.Errorf("erro ao processar possíveis relatos: %w", err)
+	}
+
+	var avaliados []model.Relato
+	for rows.Next() {
+		var relato model.Relato
+		if err := rows.Scan(
+			&relato.ID,
+			&relato.UsuarioID,
+			&relato.Tipo,
+			&relato.Descricao,
+			&relato.Latitude,
+			&relato.Longitude,
+			&relato.VotosPositivos,
+			&relato.VotosNegativos,
+			&relato.Estado,
+			&relato.CriadoEm,
+			&relato.ProximaAvaliacaoEm,
+			&relato.AtualizadoEm,
+		); err != nil {
+			rows.Close()
+			return fmt.Errorf("erro ao ler relato avaliado: %w", err)
+		}
+		avaliados = append(avaliados, relato)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return fmt.Errorf("erro ao ler relatos avaliados: %w", err)
+	}
+	rows.Close()
+
+	// Avisa o report-service do novo estado (RELATO_VALIDADO ou REJEITADO)
+	const eventoAvaliacao = "EVENTS.VALIDATIONRESPONSE.REPORT"
+	queryOutbox := `
+		INSERT INTO outbox (id, event_type, status, content, created_at, next_attempt)
+		VALUES ($1, $2, 'PENDING', $3, NOW(), NOW())`
+
+	for i := range avaliados {
+		payload, eventID, err := CriarEnvelopeEvent(eventoAvaliacao, avaliados[i])
+		if err != nil {
+			return fmt.Errorf("erro ao criar envelope do relato %s: %w", avaliados[i].ID, err)
+		}
+		if _, err := tx.ExecContext(ctx, queryOutbox, eventID, eventoAvaliacao, payload); err != nil {
+			return fmt.Errorf("erro ao inserir evento do relato %s na outbox: %w", avaliados[i].ID, err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("erro ao confirmar avaliação periódica: %w", err)
 	}
 
 	// 2. Regra para RELATO_VALIDADO:

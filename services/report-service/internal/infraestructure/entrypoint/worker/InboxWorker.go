@@ -69,18 +69,18 @@ func (i *InboxWorker) Run(ctx context.Context) error {
 			}
 			content, err := json.Marshal(inboxDTO)
 			if err == nil {
-				switch string(inbox.EventType) {
-				case string(domain.InboxGeneratedReportEvent):
+				switch eventType := string(inbox.EventType); {
+				case eventType == string(domain.InboxGeneratedReportEvent):
 					err = i.OutboxRepository.Save(ctx, domain.NewOutbox(domain.OutboxReportGeneratedError, content))
 					if err != nil {
 						log.Printf("Error while saving outbox: %v", err)
 					}
-				case string(domain.InboxValidatedReportEvent):
+				case eventType == string(domain.InboxValidatedReportEvent):
 					err = i.OutboxRepository.Save(ctx, domain.NewOutbox(domain.OutboxReportValidatedError, content))
 					if err != nil {
 						log.Printf("Error while saving outbox: %v", err)
 					}
-				case string(domain.InboxAreaDefinedReportEvent):
+				case domain.IsAreaEvent(eventType):
 					err = i.OutboxRepository.Save(ctx, domain.NewOutbox(domain.OutboxReportDefinedAreaError, content))
 					if err != nil {
 						log.Printf("Error while saving outbox: %v", err)

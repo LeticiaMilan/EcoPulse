@@ -2,6 +2,7 @@ package controller
 
 import (
 	"net/http"
+	"strconv"
 	"validacao-relato/src/model"
 	"validacao-relato/src/service"
 
@@ -65,7 +66,19 @@ func (h *RelatoController) CriarRelato(c *gin.Context) {
 }
 
 func (h *RelatoController) ListarRelatos(c *gin.Context) {
-	relatos, err := h.svc.ListarRelatos(c.Request.Context(), 10, 0)
+	// ?limit= e ?offset= opcionais (padrão 10, máximo 500)
+	limit, err := strconv.Atoi(c.DefaultQuery("limit", "10"))
+	if err != nil || limit < 1 || limit > 500 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "limit deve ser um número entre 1 e 500"})
+		return
+	}
+	offset, err := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	if err != nil || offset < 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "offset deve ser um número maior ou igual a 0"})
+		return
+	}
+
+	relatos, err := h.svc.ListarRelatos(c.Request.Context(), limit, offset)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

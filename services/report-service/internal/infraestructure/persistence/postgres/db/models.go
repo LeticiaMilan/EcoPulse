@@ -10,14 +10,17 @@ import (
 )
 
 type AffectedArea struct {
-	ID        uuid.UUID
-	Type      string
-	Status    string
-	AreaM2    float64
-	CenterLat float64
-	CenterLng float64
-	Polygon   []byte
-	UpdatedAt pgtype.Timestamptz
+	ID                  uuid.UUID
+	Type                string
+	Status              string
+	AreaM2              float64
+	CenterLat           float64
+	CenterLng           float64
+	Polygon             []byte
+	UpdatedAt           pgtype.Timestamptz
+	VotesStillHappening int32
+	VotesResolved       int32
+	VotesNeeded         int32
 }
 
 type Inbox struct {

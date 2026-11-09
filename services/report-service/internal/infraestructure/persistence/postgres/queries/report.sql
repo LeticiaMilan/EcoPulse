@@ -1,5 +1,5 @@
 -- name: CreateReport :one
-INSERT INTO report (id, latitude, longitude, type, status, user_id, datetime, area) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *;
+INSERT INTO report (id, latitude, longitude, type, status, user_id, datetime, area) VALUES ($1, $2, $3, $4, $5, $6, $7, NULLIF($8::uuid, '00000000-0000-0000-0000-000000000000'::uuid)) RETURNING *;
 
 -- name: ValidateReport :one
 UPDATE report SET status = 'validated' WHERE id = $1 RETURNING *;
@@ -26,7 +26,10 @@ SELECT
     a.center_lat,
     a.center_lng,
     a.polygon,
-    a.updated_at AS area_updated_at
+    a.updated_at AS area_updated_at,
+    a.votes_still_happening,
+    a.votes_resolved,
+    a.votes_needed
 FROM report r
          INNER JOIN affected_areas a ON a.id = r.area
 WHERE r.datetime >= $1

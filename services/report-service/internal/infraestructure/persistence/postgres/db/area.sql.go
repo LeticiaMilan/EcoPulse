@@ -14,20 +14,35 @@ import (
 
 const createArea = `-- name: CreateArea :one
 INSERT INTO affected_areas
-    (id, type, status, area_m2, center_lat, center_lng, polygon, updated_at)
+    (id, type, status, area_m2, center_lat, center_lng, polygon, updated_at, votes_still_happening, votes_resolved, votes_needed)
 VALUES
-    ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, type, status, area_m2, center_lat, center_lng, polygon, updated_at
+    ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+ON CONFLICT (id) DO UPDATE SET
+    type = EXCLUDED.type,
+    status = EXCLUDED.status,
+    area_m2 = EXCLUDED.area_m2,
+    center_lat = EXCLUDED.center_lat,
+    center_lng = EXCLUDED.center_lng,
+    polygon = EXCLUDED.polygon,
+    votes_still_happening = EXCLUDED.votes_still_happening,
+    votes_resolved = EXCLUDED.votes_resolved,
+    votes_needed = EXCLUDED.votes_needed,
+    updated_at = NOW()
+RETURNING id, type, status, area_m2, center_lat, center_lng, polygon, updated_at, votes_still_happening, votes_resolved, votes_needed
 `
 
 type CreateAreaParams struct {
-	ID        uuid.UUID
-	Type      string
-	Status    string
-	AreaM2    float64
-	CenterLat float64
-	CenterLng float64
-	Polygon   []byte
-	UpdatedAt pgtype.Timestamptz
+	ID                  uuid.UUID
+	Type                string
+	Status              string
+	AreaM2              float64
+	CenterLat           float64
+	CenterLng           float64
+	Polygon             []byte
+	UpdatedAt           pgtype.Timestamptz
+	VotesStillHappening int32
+	VotesResolved       int32
+	VotesNeeded         int32
 }
 
 func (q *Queries) CreateArea(ctx context.Context, arg CreateAreaParams) (AffectedArea, error) {
@@ -40,6 +55,9 @@ func (q *Queries) CreateArea(ctx context.Context, arg CreateAreaParams) (Affecte
 		arg.CenterLng,
 		arg.Polygon,
 		arg.UpdatedAt,
+		arg.VotesStillHappening,
+		arg.VotesResolved,
+		arg.VotesNeeded,
 	)
 	var i AffectedArea
 	err := row.Scan(
@@ -51,6 +69,9 @@ func (q *Queries) CreateArea(ctx context.Context, arg CreateAreaParams) (Affecte
 		&i.CenterLng,
 		&i.Polygon,
 		&i.UpdatedAt,
+		&i.VotesStillHappening,
+		&i.VotesResolved,
+		&i.VotesNeeded,
 	)
 	return i, err
 }

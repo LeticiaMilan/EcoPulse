@@ -32,8 +32,8 @@ func MapReportModelToApplication(reportModel *db.Report) *domain.Report {
 		Longitude: reportModel.Longitude.Float64,
 		Type:      domain.ReportType(reportModel.Type.String),
 		Status:    domain.ReportStatus(reportModel.Status.String),
-		UserID:    reportModel.ID,
-		Area:      uuid.UUID{},
+		UserID:    reportModel.UserID,
+		Area:      reportModel.Area,
 		Datetime:  reportModel.Datetime.Time,
 	}
 }
@@ -51,13 +51,14 @@ func MapOutboxModelToApplication(outboxModel *db.Outbox) *domain.Outbox {
 
 func MapReportGeneratedDTOToApplication(dto *application.ReportGeneratedEventDTO) *domain.Report {
 	return &domain.Report{
-		ID:        dto.ID,
-		Latitude:  dto.Latitude,
-		Longitude: dto.Longitude,
-		Type:      domain.ReportType(dto.Type),
-		Status:    domain.InProgress,
-		UserID:    dto.UserID,
-		Datetime:  dto.Datetime,
+		ID:          dto.ID,
+		Latitude:    dto.Latitude,
+		Longitude:   dto.Longitude,
+		Type:        domain.ReportType(dto.Type),
+		Status:      domain.InProgress,
+		UserID:      dto.UserID,
+		Datetime:    dto.Datetime,
+		Description: dto.Description,
 	}
 }
 
@@ -87,5 +88,6 @@ func MapReportAffectedAreaDTOToApplication(dto *application.ReportAreaDefinedEve
 		Polygon: dto.Polygon,
 		Reports: dto.Reports,
 		Users:   dto.Users,
+		Votes:   dto.Votes,
 	}
 }

@@ -45,27 +45,15 @@ func NewRabbitMQConn(url string) (*RabbitMQConn, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = ch.QueueBind(filaValidacao, "EVENTS.VALIDATION.*", "exchange.ecopulse", false, nil)
-	err = ch.QueueBind(filaValidacao, "EVENTS.REPORT.CREATED", "exchange.ecopulse", false, nil)
-	if err != nil {
-		return nil, err
+	for _, routingKey := range []string{"EVENTS.VALIDATION.*", "EVENTS.REPORT.CREATED"} {
+		if err := ch.QueueBind(filaValidacao, routingKey, "exchange.ecopulse", false, nil); err != nil {
+			return nil, fmt.Errorf("falha no bind da fila %s com %s: %w", filaValidacao, routingKey, err)
+		}
 	}
 
-	filaResposta := "validacao_resposta_queue"
-	_, err = ch.QueueDeclare(filaResposta, true, false, false, false, nil)
-	if err != nil {
-		return nil, fmt.Errorf("falha ao declarar nova fila: %w", err)
-	}
-	err = ch.QueueBind(
-		filaResposta,
-		"EVENTS.VALIDATIONRESPONSE.*", // Padrão que vai cair nesta nova fila
-		"exchange.ecopulse",
-		false,
-		nil,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("falha no bind da nova fila: %w", err)
-	}
+	// As respostas (EVENTS.VALIDATIONRESPONSE.*) são consumidas pela fila de cada
+	// serviço interessado (ex.: queue.service.report). A antiga validacao_resposta_queue
+	// não tinha consumidor e só acumulava mensagens, por isso foi removida.
 
 	return &RabbitMQConn{Conn: conn, Channel: ch}, nil
 }

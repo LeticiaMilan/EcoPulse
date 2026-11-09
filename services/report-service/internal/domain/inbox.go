@@ -19,8 +19,29 @@ type InboxEventType string
 const (
 	InboxGeneratedReportEvent   InboxEventType = "EVENTS.REPORT.GENERATED"
 	InboxValidatedReportEvent   InboxEventType = "EVENTS.VALIDATIONRESPONSE.REPORT"
-	InboxAreaDefinedReportEvent InboxEventType = "EVENTS.AFFECTED_AREA.RESOLVED"
+	InboxAreaDetectedEvent      InboxEventType = "EVENTS.AFFECTED_AREA.DETECTED"
+	InboxAreaUpdatedEvent       InboxEventType = "EVENTS.AFFECTED_AREA.UPDATED"
+	InboxAreaResolvedEvent      InboxEventType = "EVENTS.AFFECTED_AREA.RESOLVED"
+	InboxAreaExpiredEvent       InboxEventType = "EVENTS.AFFECTED_AREA.EXPIRED"
 )
+
+// Eventos do serviço de área afetada. Todos trazem o snapshot completo da área:
+// DETECTED/UPDATED ligam os relatos à área; RESOLVED/EXPIRED só atualizam o status dela.
+var InboxAreaEvents = []InboxEventType{
+	InboxAreaDetectedEvent,
+	InboxAreaUpdatedEvent,
+	InboxAreaResolvedEvent,
+	InboxAreaExpiredEvent,
+}
+
+func IsAreaEvent(eventType string) bool {
+	for _, areaEvent := range InboxAreaEvents {
+		if string(areaEvent) == eventType {
+			return true
+		}
+	}
+	return false
+}
 
 type Inbox struct {
 	ID           uuid.UUID

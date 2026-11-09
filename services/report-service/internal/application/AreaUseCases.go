@@ -27,6 +27,7 @@ type ReportAreaDefinedEventDTO struct {
 	Polygon json.RawMessage                 `json:"polygon"`
 	Reports []uuid.UUID                     `json:"report_ids"`
 	Users   int                             `json:"users"`
+	Votes   domain.AreaVotes                `json:"votes"`
 }
 
 type AreaUseCase struct {
@@ -79,7 +80,7 @@ func (uc *AreaDefinedUseCase) Execute(ctx context.Context, Area *domain.Area) er
 				return fmt.Errorf("falha na serialização do DTO do relato %s: %w", reportID, err)
 			}
 
-			outbox := domain.NewOutbox(domain.OutboxReportCreated, content)
+			outbox := domain.NewOutbox(domain.OutboxReportAreaDefined, content)
 			if err := uc.AreaUseCase.OutboxRepository.Save(ctx, outbox); err != nil {
 				return fmt.Errorf("falha ao registar o evento de outbox para o relato %s: %w", reportID, err)
 			}
