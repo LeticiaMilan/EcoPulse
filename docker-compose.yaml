@@ -167,7 +167,7 @@ services:
       - "5435:5432"
     volumes:
       - postgres_data_validacao:/var/lib/postgresql/data
-      - ./init-db:/docker-entrypoint-initdb.d
+      - ./services/validacao-relato/init-db:/docker-entrypoint-initdb.d
     networks:
       - validacao-network
 
