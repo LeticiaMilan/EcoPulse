@@ -39,7 +39,11 @@ function TabBar({ state, navigation }: BottomTabBarProps) {
         const badge = route.name === 'Alerts' ? alertBadge : tab.badge;
         return (
           <Pressable key={route.key} onPress={() => navigation.navigate(route.name)} style={{ flex: 1, alignItems: 'center', gap: 4 }}>
-            <View style={{ width: 60, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: on ? c.container : 'transparent' }}>
+            <View style={{ width: 60, height: 32, alignItems: 'center', justifyContent: 'center' }}>
+              <View
+                pointerEvents="none"
+                style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 16, backgroundColor: c.container, opacity: on ? 1 : 0 }}
+              />
               <MaterialIcons name={on ? tab.icon : tab.outline} size={23} color={on ? c.onContainer : c.ink2} />
               {!!badge && (
                 <View style={{ position: 'absolute', top: 2, right: 12, minWidth: 16, height: 16, borderRadius: 8, backgroundColor: c.danger, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 }}>
