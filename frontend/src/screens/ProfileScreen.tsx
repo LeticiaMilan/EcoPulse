@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -6,10 +6,24 @@ import { c, f, t, hazard, shadow } from '../theme';
 import { useApp } from '../store/AppContext';
 import { Button, Icon, Toggle } from '../components/ui';
 import type { RootNav } from '../navigation/types';
+import * as Location from 'expo-location';
 
 export default function ProfileScreen() {
   const nav = useNavigation<RootNav>();
   const app = useApp();
+  const [city, setCity] = useState('Ribeirão Preto, SP');
+  useEffect(() => {
+    (async () => {
+      try {
+        const { status } = await Location.getForegroundPermissionsAsync();
+        if (status !== 'granted') return;
+        const p = await Location.getLastKnownPositionAsync();
+        if (!p) return;
+        const [g] = await Location.reverseGeocodeAsync(p.coords);
+        if (g?.city || g?.subregion) setCity(`${g.city ?? g.subregion}${g.region ? ', ' + g.region : ''}`);
+      } catch {}
+    })();
+  }, []);
   const pend = app.pendingCount;
 
   return (
@@ -21,7 +35,7 @@ export default function ProfileScreen() {
           </View>
           <View style={{ gap: 4 }}>
             <Text style={t.titleSm}>{app.user ? app.user.username : 'Visitante'}</Text>
-            <Text style={[t.caption, { fontFamily: f.medium, fontSize: 13, color: c.ink2 }]}>{app.user ? `ID ${app.user.id} · Ribeirão Preto, SP` : 'Só consulta do mapa'}</Text>
+            <Text style={[t.caption, { fontFamily: f.medium, fontSize: 13, color: c.ink2 }]}>{app.user ? `ID ${app.user.id.slice(0, 8)} · ${city}` : 'Só consulta do mapa'}</Text>
           </View>
         </View>
 
@@ -48,7 +62,7 @@ export default function ProfileScreen() {
           </Pressable>
         </View>
 
-        {app.authed && (
+        {false && app.authed && (
           <View style={{ gap: 8 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 4 }}>
               <Text style={t.label}>Moderação</Text>
