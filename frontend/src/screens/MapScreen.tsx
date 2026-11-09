@@ -37,9 +37,6 @@ export default function MapScreen() {
     }
   };
 
-  // Ao abrir, centraliza no usuário
-  useEffect(() => { goToMe(false); }, []);
-
   // Áreas afetadas ativas (uma por área, mesmo com vários relatos dentro)
   const areas = useMemo(() => {
     const seen = new Map<string, { id: string; color: string; coords: { latitude: number; longitude: number }[] }>();
@@ -108,6 +105,7 @@ export default function MapScreen() {
     <View style={{ flex: 1, backgroundColor: c.mapBase }}>
       <MapView
         ref={mapRef}
+        onMapReady={() => goToMe(false)}
         style={StyleSheet.absoluteFill}
         provider={PROVIDER_GOOGLE}
         customMapStyle={mapStyle}
