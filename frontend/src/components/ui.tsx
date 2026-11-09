@@ -131,9 +131,9 @@ export function ScreenHeader({ title, onBack, icon = 'arrow-back' }: { title: st
 
 export function ConnectionPill() {
   const { offline, syncing, pendingCount, conflict, simOffline, setSimOffline } = useApp();
-  const n = pendingCount - (conflict === 'open' ? 1 : 0);
+  const n = pendingCount - (conflict === 'open' ? 1 : 0); // itens reais na fila do aparelho
   const [bg, fg] = offline ? [c.offBg, c.offFg] : syncing ? [c.syncBg, c.syncFg] : [c.surface, c.primaryStrong];
-  const label = syncing ? 'Sincronizando relatos…' : offline ? `Offline · ${n} ${n === 1 ? 'item' : 'itens'} no aparelho` : 'Online · tudo sincronizado';
+  const label = syncing ? 'Sincronizando relatos…' : offline ? `Offline · ${n} ${n === 1 ? 'item' : 'itens'} no aparelho` : n ? `Online · ${n} ${n === 1 ? 'item' : 'itens'} para enviar` : 'Online · tudo sincronizado';
   return (
     <Pressable onPress={() => setSimOffline(!simOffline)} style={[{ alignSelf: 'flex-start', height: 30, paddingHorizontal: 12, borderRadius: 15, flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: bg }, shadow.floating]}>
       {syncing ? <Icon name="sync" size={16} color={fg} /> : <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: fg }} />}

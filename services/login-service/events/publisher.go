@@ -10,7 +10,7 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-const ExchangeName = "ecopulse.events"
+const ExchangeName = "exchange.ecopulse"
 
 type Publisher struct {
 	DB  *sql.DB
@@ -202,7 +202,9 @@ func (p *Publisher) publishPending(
 			ctx,
 			ExchangeName,
 			event.RoutingKey,
-			true,
+			// mandatory=false: hoje nenhum serviço escuta os eventos de usuário.
+			// Com true, o RabbitMQ devolvia a mensagem e o publicador travava a fila do outbox.
+			false,
 			false,
 			message,
 		)

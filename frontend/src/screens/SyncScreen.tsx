@@ -26,7 +26,7 @@ export default function SyncScreen() {
 
   const syncNow = () => {
     if (app.offline || app.syncing) return;
-    if (pending.length) app.runSync(); else app.flash('Tudo em dia');
+    app.runSync(); // envia o que estiver na fila e atualiza a lista do servidor
   };
 
   return (

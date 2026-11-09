@@ -105,8 +105,8 @@ func (r *ReportRepositoryImpl) DefineArea(ctx context.Context, report *domain.Re
 	Query := r.GetExecutor(ctx)
 	reportOutput, err := Query.DefineAreaReport(ctx,
 		db.DefineAreaReportParams{
-			Area: report.ID,
-			ID:   report.Area,
+			Area: report.Area,
+			ID:   report.ID,
 		})
 
 	if err != nil {
@@ -163,6 +163,11 @@ func (r *ReportRepositoryImpl) GetReportSync(ctx context.Context, time time.Time
 				CenterLng: row.CenterLng,
 				Polygon:   row.Polygon,
 				UpdatedAt: row.AreaUpdatedAt.Time,
+				Votes: domain.AreaVotes{
+					StillHappening: int(row.VotesStillHappening),
+					Resolved:       int(row.VotesResolved),
+					Needed:         int(row.VotesNeeded),
+				},
 			},
 		})
 	}

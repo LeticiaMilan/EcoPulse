@@ -21,6 +21,13 @@ CREATE TABLE relatos (
     atualizado_em TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE votos (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    relato_id UUID NOT NULL REFERENCES relatos(id) ON DELETE CASCADE,
+    usuario_id UUID NOT NULL, -- Id do usuário que votou
+    UNIQUE (relato_id, usuario_id) -- Garante que um usuário só possa votar uma vez por relato
+);
+
 -- Índice para acelerar busca de relatos por estado
 CREATE INDEX idx_relatos_avaliacao ON relatos (estado, proxima_avaliacao_em);
 

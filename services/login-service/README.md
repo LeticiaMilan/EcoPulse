@@ -180,7 +180,7 @@ Exclui o usuário. Retorna `204 No Content` em caso de sucesso ou
 O serviço publica eventos na exchange RabbitMQ:
 
 ``` text
-ecopulse.events
+exchange.ecopulse
 ```
 
 **Tipo da exchange:** `topic`
@@ -224,7 +224,7 @@ O conteúdo de `data` varia conforme o evento:
     50 eventos.
 -   O serviço não cria as filas dos consumidores. Cada microsserviço
     consumidor deve declarar sua própria fila durável e vinculá-la à
-    exchange `ecopulse.events` usando a routing key correspondente.
+    exchange `exchange.ecopulse` usando a routing key correspondente.
 -   A entrega pode ocorrer mais de uma vez. Consumidores devem
     implementar idempotência usando `event_id` para evitar processar o
     mesmo evento repetidamente.

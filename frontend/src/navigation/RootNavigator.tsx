@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { c, f } from '../theme';
 import { RootStackParamList, TabParamList } from './types';
+import { useApp } from '../store/AppContext';
 import LoginScreen from '../screens/LoginScreen';
 import MapScreen from '../screens/MapScreen';
 import FiltersScreen from '../screens/FiltersScreen';
@@ -22,24 +23,27 @@ const Tab = createBottomTabNavigator<TabParamList>();
 const TABS: Record<keyof TabParamList, { label: string; icon: any; outline: any; badge?: number }> = {
   Map: { label: 'Mapa', icon: 'map', outline: 'map' },
   List: { label: 'Relatos', icon: 'list-alt', outline: 'list-alt' },
-  Alerts: { label: 'Alertas', icon: 'notifications', outline: 'notifications-none', badge: 2 },
+  Alerts: { label: 'Alertas', icon: 'notifications', outline: 'notifications-none' },
   Profile: { label: 'Perfil', icon: 'person', outline: 'person-outline' },
 };
 
 function TabBar({ state, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
+  // Número do sininho: alertas perto (no raio escolhido) ainda não vistos
+  const { alertBadge } = useApp();
   return (
     <View style={{ flexDirection: 'row', backgroundColor: c.nav, borderTopWidth: 1, borderTopColor: c.divider, paddingTop: 8, paddingBottom: insets.bottom + 8, paddingHorizontal: 8 }}>
       {state.routes.map((route, i) => {
         const on = state.index === i;
         const tab = TABS[route.name as keyof TabParamList];
+        const badge = route.name === 'Alerts' ? alertBadge : tab.badge;
         return (
           <Pressable key={route.key} onPress={() => navigation.navigate(route.name)} style={{ flex: 1, alignItems: 'center', gap: 4 }}>
             <View style={{ width: 60, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: on ? c.container : 'transparent' }}>
               <MaterialIcons name={on ? tab.icon : tab.outline} size={23} color={on ? c.onContainer : c.ink2} />
-              {!!tab.badge && (
+              {!!badge && (
                 <View style={{ position: 'absolute', top: 2, right: 12, minWidth: 16, height: 16, borderRadius: 8, backgroundColor: c.danger, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 }}>
-                  <Text style={{ fontFamily: f.extrabold, fontSize: 10, color: '#fff' }}>{tab.badge}</Text>
+                  <Text style={{ fontFamily: f.extrabold, fontSize: 10, color: '#fff' }}>{badge > 99 ? '99+' : badge}</Text>
                 </View>
               )}
             </View>

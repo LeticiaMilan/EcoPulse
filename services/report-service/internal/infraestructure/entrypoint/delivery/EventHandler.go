@@ -78,6 +78,14 @@ type AreaHandler struct {
 	useCase application.IUseCase[*domain.Area]
 }
 
+func NewReportHandler(uc application.IUseCase[*domain.Report]) *ReportHandler {
+	return &ReportHandler{useCase: uc}
+}
+
+func NewAreaHandler(uc application.IUseCase[*domain.Area]) *AreaHandler {
+	return &AreaHandler{useCase: uc}
+}
+
 func (h *ReportHandler) Handle(ctx context.Context, payload []byte, EventType string) error {
 	switch EventType {
 	case string(domain.InboxGeneratedReportEvent):
@@ -87,7 +95,7 @@ func (h *ReportHandler) Handle(ctx context.Context, payload []byte, EventType st
 		}
 		domainInbox := MapReportGeneratedDTOToApplication(&GeneratedReportDTO)
 		if err := h.useCase.Execute(ctx, domainInbox); err != nil {
-			log.Printf("[GeneratedEventHandler] Error while processing event: %w", err.Error())
+			log.Printf("[GeneratedEventHandler] Error while processing event: %v", err)
 			return err
 		}
 	case string(domain.InboxValidatedReportEvent):
@@ -97,7 +105,7 @@ func (h *ReportHandler) Handle(ctx context.Context, payload []byte, EventType st
 		}
 
 		if err := h.useCase.Execute(ctx, MapReportValidatedDTOToApplication(&ValidatedReportDTO)); err != nil {
-			log.Printf("[ValidatedEventHandler] Error while processing event: %w", err.Error())
+			log.Printf("[ValidatedEventHandler] Error while processing event: %v", err)
 			return err
 		}
 
@@ -109,14 +117,14 @@ func (h *ReportHandler) Handle(ctx context.Context, payload []byte, EventType st
 }
 
 func (h *AreaHandler) Handle(ctx context.Context, payload []byte, EventType string) error {
-	switch EventType {
-	case string(domain.InboxAreaDefinedReportEvent):
+	switch {
+	case domain.IsAreaEvent(EventType):
 		var AreaDefinedReportDTO application.ReportAreaDefinedEventDTO
 		if err := json.Unmarshal(payload, &AreaDefinedReportDTO); err != nil {
 			return fmt.Errorf("cannot unmarshal payload: %w", err)
 		}
 		if err := h.useCase.Execute(ctx, MapReportAffectedAreaDTOToApplication(&AreaDefinedReportDTO)); err != nil {
-			log.Printf("[ValidatedEventHandler] Error while processing event: %w", err.Error())
+			log.Printf("[ValidatedEventHandler] Error while processing event: %v", err)
 			return err
 		}
 

@@ -13,12 +13,13 @@ import (
 )
 
 type ReportGeneratedEventDTO struct {
-	ID        uuid.UUID `json:"id"`
-	Latitude  float64   `json:"latitude"`
-	Longitude float64   `json:"longitude"`
-	Type      string    `json:"type"`
-	UserID    uuid.UUID `json:"user_id"`
-	Datetime  time.Time `json:"datetime"`
+	ID          uuid.UUID `json:"id"`
+	Latitude    float64   `json:"latitude"`
+	Longitude   float64   `json:"longitude"`
+	Type        string    `json:"type"`
+	UserID      uuid.UUID `json:"user_id"`
+	Datetime    time.Time `json:"datetime"`
+	Description string    `json:"description"`
 }
 
 type ReportValidatedEventDTO struct {
@@ -81,7 +82,7 @@ func (uc *GeneratedReportUseCase) Execute(ctx context.Context, report *domain.Re
 		return err
 	}
 
-	outbox := domain.NewOutbox(domain.OutboxReportGenerated, content)
+	outbox := domain.NewOutbox(domain.OutboxReportCreated, content)
 
 	if err := uc.ReportUseCase.OutboxRepository.Save(ctx, outbox); err != nil {
 		return err
@@ -195,6 +196,7 @@ type ReportDTO struct {
 	UserId    uuid.UUID `json:"user_id"`
 	Area      string    `json:"area"`
 	Datetime  time.Time `json:"datetime"`
+	Descricao string    `json:"descricao,omitempty"` // lido pelo validacao-relato
 }
 
 func MapReportToReportDTO(report *domain.Report) ReportDTO {
@@ -207,5 +209,6 @@ func MapReportToReportDTO(report *domain.Report) ReportDTO {
 		UserId:    report.UserID,
 		Area:      "",
 		Datetime:  report.Datetime,
+		Descricao: report.Description,
 	}
 }

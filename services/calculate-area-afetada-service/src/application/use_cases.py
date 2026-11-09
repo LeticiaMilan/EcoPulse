@@ -76,4 +76,5 @@ def _snapshot(area: AffectedArea) -> dict:
         "reports": len(area.reports),
         "report_ids": [str(r.report_id) for r in area.reports],
         "users": area.distinct_users,
+        "votes": area.vote_counts,
     }

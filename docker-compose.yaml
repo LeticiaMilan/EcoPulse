@@ -13,7 +13,9 @@ services:
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     healthcheck:
-      test: [ "CMD", "rabbitmq-diagnostics", "-q", "ping" ]
+      # check_port_connectivity só passa quando a porta AMQP (5672) já aceita conexões.
+      # O "ping" passava antes disso e os serviços tentavam conectar cedo demais.
+      test: [ "CMD", "rabbitmq-diagnostics", "-q", "check_port_connectivity" ]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -56,7 +58,7 @@ services:
     environment:
       JWT_SECRET: "ecopulse-segredo-local-123456789012345"
 
-      DB_HOST: postgres
+      DB_HOST: login-postgres
       DB_PORT: 5432
       DB_USERNAME: ecopulse
       DB_PASSWORD: ecopulse_dev
@@ -167,7 +169,7 @@ services:
       - "5435:5432"
     volumes:
       - postgres_data_validacao:/var/lib/postgresql/data
-      - ./init-db:/docker-entrypoint-initdb.d
+      - ./services/validacao-relato/init-db:/docker-entrypoint-initdb.d
     networks:
       - validacao-network
 
@@ -182,10 +184,40 @@ services:
       - DB_URL=postgres://postgres:dbadmin@postgres-validacao:5432/aps_validacao?sslmode=disable
       - RABBITMQ_URL=amqp://ecopulse:ecopulse_dev@rabbitmq:5672/
     depends_on:
-      - postgres-validacao
-      - rabbitmq
+      postgres-validacao:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
     networks:
       - validacao-network
+
+  # BFF: porta de entrada do app (publica relatos no RabbitMQ e consulta report/validacao via HTTP)
+  bff:
+    build: ./services/bff
+    container_name: ecopulse-bff
+    restart: unless-stopped
+    ports:
+      - "8090:8090"
+    environment:
+      PORT: 8090
+      # Precisa ser o mesmo JWT_SECRET do login-service para validar os tokens
+      JWT_SECRET: "ecopulse-segredo-local-123456789012345"
+      RABBITMQ_URL: "amqp://ecopulse:ecopulse_dev@rabbitmq:5672/"
+      REPORT_SERVICE_URL: "http://report-service:8080"
+      VALIDATION_SERVICE_URL: "http://validacao-service:8080"
+      # Usado só para mostrar o nome de quem criou o relato
+      LOGIN_SERVICE_URL: "http://login-service:8080"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      report-service:
+        condition: service_started
+      validacao-service:
+        condition: service_started
+    networks:
+      - report-network
+      - validacao-network
+      - login-network
 
 volumes:
   postgres_data_login:

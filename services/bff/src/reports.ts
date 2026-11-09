@@ -7,9 +7,9 @@ export const reports = Router();
 const TYPES = ['Flooding', 'Thunderstorm', 'Fire Disaster', 'Landslide'];
 const SEVERITIES = ['LOW', 'MEDIUM', 'HIGH'];
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const NEEDED = 5;
 const REPORT_URL = process.env.REPORT_SERVICE_URL ?? '';
-const VALIDATION_URL = process.env.VALIDATION_SERVICE_URL ?? '';  
+const VALIDATION_URL = process.env.VALIDATION_SERVICE_URL ?? '';
+const LOGIN_URL = process.env.LOGIN_SERVICE_URL ?? '';
 
 // respostas já dadas
 const seen = new Map<string, unknown>();
@@ -25,11 +25,6 @@ const myVotes = new Map<string, boolean>(); // chave: "reportId:userId"
 
 const fail = (res: any, status: number, code: string, message: string) =>
     res.status(status).json({ error: { code, message } });
-
-function view(r: StoredReport, userId?: string) {
-    const mine = userId ? myVotes.get(`${r.id}:${userId}`) : undefined;
-    return { ...r, votes: { ...r.votes, needed: NEEDED, my_vote: mine ?? null }, area: null };
-}
 
 // ---------- POST /reports ----------
 reports.post('/reports', requireAuth, async (req, res) => {
@@ -105,7 +100,6 @@ reports.post('/reports/:id/vote', requireAuth, async (req, res) => {
     const local = store.get(id);
     if (local) {
         if (positive) local.votes.positive++; else local.votes.negative++;
-        if (local.status === 'POSSIVEL_RELATO' && local.votes.positive >= NEEDED) local.status = 'RELATO_VALIDADO';
         local.updated_at = new Date().toISOString();
     }
 
@@ -113,53 +107,129 @@ reports.post('/reports/:id/vote', requireAuth, async (req, res) => {
 });
 
 // ---------- GET /reports ----------
-async function fromReportService(since: string, limit: number) {
-    if (!REPORT_URL) return null;
+// Monta a lista juntando os serviços (cada um é dono de uma parte do relato):
+//   validacao-relato -> relato, descrição, votos e estado da votação
+//   report-service   -> área afetada à qual o relato foi ligado
+//   login-service    -> nome de quem criou
+//   cópia local      -> gravidade e endereço, e relatos recém-criados que ainda estão a caminho
+// Status devolvido: pending | validated | rejected | resolved
+
+type Relato = {
+    id: string; usuario_id: string; tipo: string; descricao: string; latitude: number; longitude: number;
+    votos_positivos: number; votos_negativos: number; estado: string; criado_em: string; atualizado_em: string;
+};
+type SyncArea = {
+    id: string; status: string; area_m2: number; center_lat: number; center_lng: number; polygon: unknown; updated_at: string;
+    votes?: { still_happening: number; resolved: number; needed: number };
+};
+type SyncRow = { id: string; area?: SyncArea };
+
+// ok=false: o serviço não respondeu. Um corpo `null` com ok=true é lista vazia (Go serializa slice vazio como null).
+async function getJson<T>(url: string): Promise<{ ok: boolean; body: T | null }> {
     try {
-        const q = new URLSearchParams({ limit: String(limit), ...(since ? { since } : {}) });
-        const res = await fetch(`${REPORT_URL}/report/api/sync?${q}`, { signal: AbortSignal.timeout(3000) });
-        if (!res.ok) return null;
-        const body = await res.json();
-        return (body.data ?? []) as any[];
+        const res = await fetch(url, { signal: AbortSignal.timeout(3000) });
+        if (!res.ok) return { ok: false, body: null };
+        return { ok: true, body: (await res.json()) as T | null };
     } catch {
-        return null; // serviço fora: usa a cópia local
+        return { ok: false, body: null };
     }
+}
+
+const usernames = new Map<string, string>();
+let usernamesAt = 0;
+async function refreshUsernames() {
+    if (!LOGIN_URL || Date.now() - usernamesAt < 10_000) return;
+    const { ok, body } = await getJson<{ id: string; username: string }[]>(`${LOGIN_URL}/users`);
+    if (!ok) return;
+    for (const u of body ?? []) usernames.set(u.id, u.username);
+    usernamesAt = Date.now();
+}
+
+function statusOf(estado: string | undefined, areaStatus: string | undefined) {
+    if (areaStatus === 'resolved' || areaStatus === 'expired') return 'resolved';
+    if (areaStatus === 'active') return 'validated';
+    if (estado === 'RELATO_VALIDADO') return 'validated';
+    if (estado === 'REJEITADO') return 'rejected';
+    return 'pending';
+}
+
+async function buildReports(userId: string | undefined) {
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const [relatos, sync] = await Promise.all([
+        VALIDATION_URL ? getJson<Relato[]>(`${VALIDATION_URL}/validacaorelatos?limit=500`) : Promise.resolve({ ok: false, body: null }),
+        REPORT_URL ? getJson<{ data: SyncRow[] | null }>(`${REPORT_URL}/report/api/sync?limit=100&since=${encodeURIComponent(since)}`) : Promise.resolve({ ok: false, body: null }),
+        refreshUsernames(),
+    ]);
+
+    const relatoById = new Map((relatos.body ?? []).map(r => [r.id, r]));
+    const areaByReport = new Map<string, SyncArea>();
+    for (const row of sync.body?.data ?? []) if (row.area?.id) areaByReport.set(row.id, row.area);
+
+    const ids = new Set<string>([...relatoById.keys(), ...store.keys()]);
+    const data = [...ids].map(id => {
+        const v = relatoById.get(id);
+        const s = store.get(id);
+        const a = areaByReport.get(id);
+        const user_id = v?.usuario_id ?? s?.user_id ?? '';
+        return {
+            id,
+            type: v?.tipo ?? s?.type ?? '',
+            status: statusOf(v?.estado ?? 'POSSIVEL_RELATO', a?.status),
+            severity: s?.severity ?? 'MEDIUM',
+            description: v?.descricao || s?.description || '',
+            address: s?.address ?? '',
+            latitude: v?.latitude ?? s?.latitude ?? 0,
+            longitude: v?.longitude ?? s?.longitude ?? 0,
+            user_id,
+            username: usernames.get(user_id) ?? s?.username ?? '',
+            datetime: v?.criado_em ?? s?.datetime ?? '',
+            updated_at: a?.updated_at ?? v?.atualizado_em ?? s?.updated_at ?? '',
+            votes: {
+                positive: v?.votos_positivos ?? s?.votes.positive ?? 0,
+                negative: v?.votos_negativos ?? s?.votes.negative ?? 0,
+                my_vote: userId ? myVotes.get(`${id}:${userId}`) ?? null : null,
+            },
+            area: a ? {
+                id: a.id, status: a.status, area_m2: a.area_m2,
+                center: { latitude: a.center_lat, longitude: a.center_lng }, polygon: a.polygon,
+                votes: a.votes ?? { still_happening: 0, resolved: 0, needed: 0 },
+            } : null,
+        };
+    });
+    data.sort((x, y) => y.datetime.localeCompare(x.datetime));
+    return { data, partial: !relatos.ok || !sync.ok };
 }
 
 reports.get('/reports', optionalAuth, async (req, res) => {
     const user = res.locals.user as AuthUser | null;
-    const since = String(req.query.since ?? '');
-    const limit = Math.min(100, Math.max(1, Number(req.query.limit ?? 100)));
-
-    const remote = await fromReportService(since, limit);
-    if (remote) {
-        const data = remote.map(d => {
-            const local = store.get(d.id);
-            return {
-                id: d.id, type: d.type, status: d.status,
-                severity: local?.severity ?? 'MEDIUM', description: local?.description ?? '',
-                address: local?.address ?? '', latitude: d.latitude, longitude: d.longitude,
-                user_id: d.user_id, username: local?.username ?? '', datetime: d.datetime,
-                updated_at: d.area?.updated_at ?? d.datetime,
-                votes: { ...(local?.votes ?? { positive: 0, negative: 0 }), needed: NEEDED, my_vote: user ? myVotes.get(`${d.id}:${user.id}`) ?? null : null },
-                area: d.area?.area_m2 ? { area_m2: d.area.area_m2, center_lat: d.area.center_lat, center_lng: d.area.center_lng, polygon: d.area.polygon } : null,
-            };
-        });
-        return res.json({ data, next_since: new Date().toISOString(), source: 'report-service' });
-    }
-
-    const data = [...store.values()]
-        .filter(r => !since || r.updated_at > since)
-        .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
-        .slice(0, limit)
-        .map(r => view(r, user?.id));
-    res.json({ data, next_since: new Date().toISOString(), source: 'bff-cache' });
+    const limit = Math.min(500, Math.max(1, Number(req.query.limit ?? 200) || 200));
+    const { data, partial } = await buildReports(user?.id);
+    // partial = algum serviço não respondeu (a lista pode estar incompleta)
+    res.json({ data: data.slice(0, limit), partial, generated_at: new Date().toISOString() });
 });
 
 // ---------- GET /reports/:id ----------
-reports.get('/reports/:id', optionalAuth, (req, res) => {
-    const r = store.get(String(req.params.id));
-    if (!r) return fail(res, 404, 'NOT_FOUND', 'Relato não encontrado');
+reports.get('/reports/:id', optionalAuth, async (req, res) => {
     const user = res.locals.user as AuthUser | null;
-    res.json(view(r, user?.id));
+    const { data } = await buildReports(user?.id);
+    const r = data.find(d => d.id === String(req.params.id));
+    if (!r) return fail(res, 404, 'NOT_FOUND', 'Relato não encontrado');
+    res.json(r);
+});
+
+// ---------- POST /areas/:id/vote ----------
+// Voto "a situação ainda está acontecendo?" numa área afetada ativa.
+// O calculate-area-service encerra a área (RESOLVED) quando os "não" atingem o mínimo e superam os "sim".
+reports.post('/areas/:id/vote', requireAuth, async (req, res) => {
+    const user = res.locals.user as AuthUser;
+    const id = String(req.params.id);
+    if (!UUID.test(id)) return fail(res, 400, 'INVALID_ID', 'id deve ser UUID');
+    if (typeof req.body?.still_happening !== 'boolean') return fail(res, 400, 'INVALID_VOTE', 'still_happening deve ser true ou false');
+
+    try {
+        await publish('EVENTS.AFFECTED_AREA.VOTE', { area_id: id, user_id: user.id, still_happening: req.body.still_happening });
+    } catch {
+        return fail(res, 503, 'BROKER_UNAVAILABLE', 'Serviço temporariamente indisponível');
+    }
+    res.status(202).json({ area_id: id, still_happening: req.body.still_happening, accepted_at: new Date().toISOString() });
 });
