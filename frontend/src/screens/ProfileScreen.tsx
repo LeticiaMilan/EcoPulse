@@ -60,6 +60,14 @@ export default function ProfileScreen() {
             </View>
             <Toggle value={app.simOffline} color={c.offTrack} />
           </Pressable>
+          <Pressable onPress={() => { app.simulateConflict(); nav.navigate('Sync'); }} style={{ flexDirection: 'row', alignItems: 'center', gap: 14, height: 58, paddingHorizontal: 18, borderTopWidth: 1, borderTopColor: c.divider }}>
+            <Icon name="merge" color={c.ink2} />
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontFamily: f.semibold, fontSize: 15, color: c.ink }}>Simular conflito de edição</Text>
+              <Text style={[t.caption, { fontSize: 11 }]}>Modo demonstração</Text>
+            </View>
+            <Icon name="chevron-right" size={20} color={c.ink3} />
+          </Pressable>
         </View>
 
         {false && app.authed && (

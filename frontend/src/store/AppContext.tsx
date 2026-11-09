@@ -76,9 +76,11 @@ function distText(here: { lat: number; lng: number } | null, lat: number, lng: n
 
 // Legenda curta usada no mapa e na lista
 export function voteCaption(r: Report) {
+  const conf = (n: number) => `${n} ${n === 1 ? 'confirmação' : 'confirmações'}`;
   if (r.status === 'pend') return `${r.votes}/${NEED_VOTES} confirmam`;
-  if (r.status === 'val') return r.area?.status === 'active' ? 'área afetada ativa' : 'validado';
-  return r.rejected ? 'rejeitado' : 'encerrado';
+  if (r.status === 'val') return r.area?.status === 'active' ? 'área afetada ativa' : 'confirmado pela comunidade';
+  if (r.rejected) return r.votes ? `${conf(r.votes)} · ${r.negative ?? 0} contra` : 'ninguém confirmou';
+  return 'situação resolvida';
 }
 
 // Chave do voto: a confirmação é por relato; o "já foi resolvido?" é por área
@@ -340,7 +342,8 @@ function useAppState() {
     filters, setFilters, filtersActive, clearFilters: () => setFilters({ ...defaultFilters, statuses: { pend: true, val: true, fin: true } }),
     alertRadius, setAlertRadius, alertTypes, toggleAlertType: (k: HazardType) => setAlertTypes(a => ({ ...a, [k]: !a[k] })),
     nearbyAlerts, alertBadge, markAlertsSeen,
-    conflict, resolveConflict: (v: 'mine' | 'server') => { setConflict(v); flash(v === 'mine' ? 'Sua versão será enviada' : 'Versão do servidor aplicada'); },
+    conflict, simulateConflict: () => setConflict('open'),
+    resolveConflict: (v: 'mine' | 'server') => { setConflict(v); flash(v === 'mine' ? 'Sua versão será enviada' : 'Versão do servidor aplicada'); },
     modQueue, moderate: (id: string, ok: boolean) => { setModQueue(q => q.filter(m => m.id !== id)); flash(ok ? 'Relato aprovado' : 'Relato reprovado e removido'); },
     toast, flash,
   };

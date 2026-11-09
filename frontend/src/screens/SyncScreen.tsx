@@ -53,14 +53,14 @@ export default function SyncScreen() {
               <Icon name="merge" color={c.offFg} />
               <Text style={[t.bodyStrong, { fontFamily: f.extrabold, flex: 1 }]}>Versões diferentes do mesmo relato</Text>
             </View>
-            <Text style={[t.caption, { fontFamily: f.medium, fontSize: 13, lineHeight: 19, color: c.ink2 }]}>“Deslizamento de terra na encosta” foi editado no seu aparelho (offline) e no servidor ao mesmo tempo.</Text>
+            <Text style={[t.caption, { fontFamily: f.medium, fontSize: 13, lineHeight: 19, color: c.ink2 }]}>“Terra deslizando na calçada” foi editado no seu aparelho (offline) e no servidor ao mesmo tempo.</Text>
             <View style={{ flexDirection: 'row', gap: 8 }}>
-              <Version title="No aparelho" sev="Gravidade alta" note="“Casa atingida”" meta="09:02 · v3" />
-              <Version title="No servidor" sev="Gravidade média" note="“Terra na calçada”" meta="09:05 · v3′" />
+              <Version title="No aparelho" sev="Gravidade alta" note="“Terra cobrindo metade da rua”" meta="09:02 · v3" />
+              <Version title="No servidor" sev="Gravidade média" note="“Terra só na calçada”" meta="09:05 · v3′" />
             </View>
             <View style={{ flexDirection: 'row', gap: 8 }}>
-              <Button style={{ flex: 1 }} size="md" label="Manter a minha" onPress={() => app.resolveConflict('mine')} />
-              <Button style={{ flex: 1 }} size="md" variant="secondary" label="Usar a do servidor" onPress={() => app.resolveConflict('server')} />
+              <Button style={{ flex: 1 }} size="md" label="Minha versão" onPress={() => app.resolveConflict('mine')} />
+              <Button style={{ flex: 1 }} size="md" variant="secondary" label="Do servidor" onPress={() => app.resolveConflict('server')} />
             </View>
             <Text style={[t.caption, { fontFamily: f.medium, lineHeight: 17 }]}>Votos nunca conflitam: são somados. Nos outros campos, a versão mais recente é sugerida.</Text>
           </Card>
