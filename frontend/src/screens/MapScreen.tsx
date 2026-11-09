@@ -188,20 +188,17 @@ export default function MapScreen() {
                 <Pressable onPress={() => openDetail(r)} style={[{ width: CARD_W, backgroundColor: c.surface, borderRadius: 22, padding: 14, flexDirection: 'row', gap: 12, alignItems: 'center', borderWidth: 2, borderColor: on ? c.primary : 'transparent' }, shadow.raised]}>
                   <HazardIcon type={r.type} size={48} solid />
                   <View style={{ flex: 1, gap: 4 }}>
-                    <Text style={[t.overline, { fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.6 }]} numberOfLines={1}>{hazard[r.type].name}{r.dist ? ` · ${r.dist}` : ''}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <Text style={[t.overline, { flex: 1, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.6 }]} numberOfLines={1}>{hazard[r.type].name}{r.dist ? ` · ${r.dist}` : ''}</Text>
+                      {items.length > 1 && <Text style={[t.caption, { fontFamily: f.bold }]}>{index + 1}/{items.length}</Text>}
+                    </View>
                     <Text style={t.bodyStrong} numberOfLines={1}>{r.title}</Text>
                     <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
                       <StatusChip status={r.status} />
-                      <Text style={t.caption} numberOfLines={1}>{voteCaption(r)}</Text>
+                      <Text style={[t.caption, { flexShrink: 1 }]} numberOfLines={1}>{voteCaption(r)}</Text>
                     </View>
                   </View>
-                  <View style={{ alignItems: 'flex-end', gap: 8 }}>
-                    <Text style={[t.caption, { fontFamily: f.bold }]}>{index + 1}/{items.length}</Text>
-                    <Pressable onPress={() => openDetail(r)} hitSlop={6} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 2, height: 32, paddingLeft: 12, paddingRight: 6, borderRadius: 16, backgroundColor: c.container, opacity: pressed ? 0.8 : 1 })}>
-                      <Text style={{ fontFamily: f.bold, fontSize: 13, color: c.onContainer }}>Ver relato</Text>
-                      <Icon name="chevron-right" size={18} color={c.onContainer} />
-                    </Pressable>
-                  </View>
+                  <Icon name="chevron-right" color={c.ink3} />
                 </Pressable>
               );
             }}
